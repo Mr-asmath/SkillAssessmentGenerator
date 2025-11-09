@@ -36,6 +36,7 @@ st.markdown("""
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9528883210742461"
       crossorigin="anonymous"></script>
   <meta name="keywords" content="Mohamed Asmathulla G, Mohamed Asmathulla, Developer, Programmer, Portfolio, Netlify website">
+<meta name="google-site-verification" content="P-DfZP7e5bvEmf6Q-AXkCgMRVQvfpCnb6S0oW9Ov5uE" />
   
   <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-3B7V24RVQR"></script>
