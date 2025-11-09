@@ -20,7 +20,7 @@ genai.configure(api_key="AIzaSyBoiCnFfKwTfQLNhPJt6DUQLXcFw3OoaY0")
 # --- Streamlit App Setup with Enhanced UI ---
 st.set_page_config(
     page_title="Skill Assessment Generator", 
-    page_icon="https://orange-space-palm-tree-r4xwj7wjj6rc5rr-8504.app.github.dev/media/3ed033557b827c91afc1f11cac78eb2cdc2b963c214d550ab232c6a5.jpg",
+    page_icon="https://skillassessmentgenerator.netlify.app/QAUpload/favicon.png",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -29,7 +29,7 @@ st.set_page_config(
 st.markdown("""
 <head>
       <title>Skill Assessment Generator</title>
-       <link rel="icon" type="image/png" href="https://orange-space-palm-tree-r4xwj7wjj6rc5rr-8504.app.github.dev/media/3ed033557b827c91afc1f11cac78eb2cdc2b963c214d550ab232c6a5.jpg">
+       <link rel="icon" type="image/png" href="https://skillassessmentgenerator.netlify.app/QAUpload/favicon.png">
 </head>
 <style>
     .main-header {
@@ -323,3 +323,4 @@ st.markdown(
     unsafe_allow_html=True
 
 )
+
