@@ -3,6 +3,17 @@ import google.generativeai as genai
 import time
 import random
 
+# Hide Streamlit menu and footer
+hide_st_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    </style>
+"""
+
+st.markdown(hide_st_style, unsafe_allow_html=True)
+
 # --- Configure Gemini API directly ---
 genai.configure(api_key="AIzaSyBoiCnFfKwTfQLNhPJt6DUQLXcFw3OoaY0")
 
