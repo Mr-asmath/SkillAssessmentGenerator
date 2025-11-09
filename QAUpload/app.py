@@ -27,6 +27,10 @@ st.set_page_config(
 
 # Custom CSS for better styling
 st.markdown("""
+<head>
+      <title>Skill Assessment Generator</title>
+       <link rel="icon" type="image/png" href="favicon.png">
+</head>
 <style>
     .main-header {
         font-size: 3rem;
