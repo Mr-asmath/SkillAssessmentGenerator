@@ -30,6 +30,21 @@ st.markdown("""
 <head>
       <title>Skill Assessment Generator</title>
        <link rel="icon" type="image/png" href="https://skillassessmentgenerator.netlify.app/QAUpload/favicon.png">
+       <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9528883210742461"
+      crossorigin="anonymous"></script>
+  <meta name="keywords" content="Mohamed Asmathulla G, Mohamed Asmathulla, Developer, Programmer, Portfolio, Netlify website">
+  
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-3B7V24RVQR"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-3B7V24RVQR');
+  </script>
 </head>
 <style>
     .main-header {
@@ -323,4 +338,5 @@ st.markdown(
     unsafe_allow_html=True
 
 )
+
 
