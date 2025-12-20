@@ -3252,7 +3252,7 @@ def load_css():
     /* Buttons - Fixed */
     div.stButton > button {
         width: 100% !important;
-        background: transparent;
+        background: !important;
         color: white !important;
         border: none !important;
         padding: 0.875rem 1.5rem !important;
