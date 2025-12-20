@@ -3248,7 +3248,7 @@ def load_css():
     /* Buttons - Fixed */
     div.stButton > button {
         width: 100% !important;
-        background: linear-gradient(45deg, var(--primary), var(--primary-dark)) !important;
+        background: transparent;
         color: white !important;
         border: none !important;
         padding: 0.875rem 1.5rem !important;
@@ -3399,6 +3399,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
