@@ -584,7 +584,7 @@ def show_dashboard_home():
     # Test Generator Section (Top of Dashboard)
     st.markdown("""
     <div class="test-generator-card">
-        <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem; color: white;">🎯 Quick Test Generator</h2>
+        <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem; color: #eee;">🎯 Quick Test Generator</h2>
         <p style="color: rgba(255, 255, 255, 0.9); margin-bottom: 1.5rem;">
             Create a new assessment instantly
         </p>
@@ -619,7 +619,7 @@ def show_dashboard_home():
     st.markdown("<br><br>", unsafe_allow_html=True)
     
     # Field Tests Container
-    st.markdown("### 🎓 Explore Field Tests")
+    st.markdown("<h2 style='color:#eee'>### 🎓 Explore Field Tests</h2>")
     st.markdown("Select from various assessment categories:")
     
     # Create field test containers
@@ -648,7 +648,7 @@ def show_dashboard_home():
     
     # Recent Assessments
     st.markdown("<br><br>", unsafe_allow_html=True)
-    st.markdown("### 📋 Recent Assessments")
+    st.markdown("<h2 style='color:#eee'>### 📋 Recent Assessments</h2>")
     
     if stats['recent_tests']:
         for test in stats['recent_tests'][:3]:
@@ -3399,5 +3399,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
