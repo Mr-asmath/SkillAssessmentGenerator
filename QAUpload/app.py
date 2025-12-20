@@ -696,7 +696,7 @@ def show_test_generator():
     
     # Test Generator Container
     with st.container():
-        st.markdown("<h2 style='color:#eee'> 📝 Create New Assessment </h2>",, unsafe_allow_html=True)
+        st.markdown("<h2 style='color:#eee'> 📝 Create New Assessment </h2>", unsafe_allow_html=True)
         
         # Test Type Selection
         col1, col2 = st.columns(2)
@@ -3399,6 +3399,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
