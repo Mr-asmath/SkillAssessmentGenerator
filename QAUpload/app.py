@@ -483,7 +483,7 @@ def learner_dashboard():
         st.markdown("---")
         
         # Navigation Menu
-        st.markdown("### 📍 Navigation")
+        st.markdown("<h2 style='color:#eee'>📍 Navigation </h2>", , unsafe_allow_html=True)
         
         # Create menu buttons
         menu_items = [
@@ -619,7 +619,7 @@ def show_dashboard_home():
     st.markdown("<br><br>", unsafe_allow_html=True)
     
     # Field Tests Container
-    st.markdown("<h2 style='color:#eee'>### 🎓 Explore Field Tests</h2>")
+    st.markdown("<h2 style='color:#eee'>🎓 Explore Field Tests</h2>", unsafe_allow_html=True)
     st.markdown("Select from various assessment categories:")
     
     # Create field test containers
@@ -648,7 +648,7 @@ def show_dashboard_home():
     
     # Recent Assessments
     st.markdown("<br><br>", unsafe_allow_html=True)
-    st.markdown("<h2 style='color:#eee'>### 📋 Recent Assessments</h2>")
+    st.markdown("<h2 style='color:#eee'>📋 Recent Assessments</h2>", unsafe_allow_html=True)
     
     if stats['recent_tests']:
         for test in stats['recent_tests'][:3]:
@@ -696,7 +696,7 @@ def show_test_generator():
     
     # Test Generator Container
     with st.container():
-        st.markdown("### 📝 Create New Assessment")
+        st.markdown("<h2 style='color:#eee'> 📝 Create New Assessment </h2>",, unsafe_allow_html=True)
         
         # Test Type Selection
         col1, col2 = st.columns(2)
@@ -780,7 +780,7 @@ def show_test_generator():
     
     # Display existing assessments
     st.markdown("<br><br>", unsafe_allow_html=True)
-    st.markdown("### 📋 Existing Skill Assessments")
+    st.markdown("<h2 style='color:#eee'>📋 Existing Skill Assessments</h2>", unsafe_allow_html=True)
     
     history = get_assessment_history(st.session_state.user_id, 5)
     if history:
@@ -850,7 +850,7 @@ def show_my_assessments():
             st.metric("Last 7 Days", recent_tests)
         
         # Assessment History Table
-        st.markdown("### 📋 Assessment History")
+        st.markdown("<h2 style='color:#eee'> 📋 Assessment History </h2>", unsafe_allow_html=True)
         
         # Create DataFrame
         df_data = []
@@ -889,7 +889,7 @@ def show_my_assessments():
                 st.plotly_chart(fig, use_container_width=True)
         
         with col2:
-            st.markdown("### 📊 Performance Trend")
+            st.markdown("<h2 style='color:#eee'> 📊 Performance Trend</h2>", unsafe_allow_html=True)
             if history:
                 dates = [h[5][:10] for h in history]
                 percentages = [(h[2]/h[3]*100) if h[3] > 0 else 0 for h in history]
@@ -992,7 +992,7 @@ def show_leaderboard():
                 st.divider()
             
             # User's position
-            st.markdown("### 🎯 Your Position")
+            st.markdown("<h2 style='color:#eee'> 🎯 Your Position </h2>", unsafe_allow_html=True)
             
             # Find user's rank
             user_found = False
@@ -1029,7 +1029,7 @@ def show_leaderboard():
         st.info("No assessment data available yet. Take some tests to appear on the leaderboard!")
     
     # Top Topics Leaderboard
-    st.markdown("### 🎓 Top Performing Topics")
+    st.markdown("<h2 style='color:#eee'>🎓 Top Performing Topics</h2>", unsafe_allow_html=True)
     
     # Get user's scores for all topics
     user_scores = get_user_scores(st.session_state.user_id)
@@ -3399,6 +3399,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
