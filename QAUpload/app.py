@@ -3141,7 +3141,7 @@ def load_css():
         /* Light Theme Colors */
         --bg-primary: #ffffff;
         --bg-secondary: #f8fafc;
-        --bg-sidebar: #ffffff;
+        --bg-sidebar: blue;
         --text-primary: #1e293b;
         --text-secondary: #475569;
         --border-color: #e2e8f0;
@@ -3399,6 +3399,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
