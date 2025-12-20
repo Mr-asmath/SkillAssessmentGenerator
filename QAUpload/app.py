@@ -89,7 +89,7 @@ def init_db():
             FOREIGN KEY (user_id) REFERENCES users (id)
         )
     ''')
-    c.execute("""alter table users add is_admin int""")
+
     
     # Create admin user if not exists
     admin_password_hash = hash_password("admin@1234")
@@ -3399,4 +3399,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
