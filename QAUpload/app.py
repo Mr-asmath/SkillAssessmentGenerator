@@ -483,7 +483,7 @@ def learner_dashboard():
         st.markdown("---")
         
         # Navigation Menu
-        st.markdown("<h2 style='color:#eee'>📍 Navigation </h2>", , unsafe_allow_html=True)
+        st.markdown("<h2 style='color:#eee'>📍 Navigation </h2>",  unsafe_allow_html=True)
         
         # Create menu buttons
         menu_items = [
@@ -3399,6 +3399,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
