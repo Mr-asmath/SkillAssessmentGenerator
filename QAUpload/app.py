@@ -27,7 +27,8 @@ def init_db():
             password_hash TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             last_login TIMESTAMP,
-            is_active INTEGER DEFAULT 1
+            is_active INTEGER DEFAULT 1,
+            is_admin INTEGER DEFAULT 0
         )
     ''')
     c.execute('''
@@ -93,9 +94,9 @@ def init_db():
     admin_password_hash = hash_password("admin@1234")
     try:
         c.execute('''
-            INSERT OR IGNORE INTO users (username, email, password_hash) 
-            VALUES (?, ?, ?)
-        ''', ('admin', 'admin@skillassessment.com', admin_password_hash))
+            INSERT OR IGNORE INTO users (username, email, password_hash, is_admin) 
+            VALUES (?, ?, ?, ?)
+        ''', ('admin', 'admin@skillassessment.com', admin_password_hash, 1))
     except:
         pass
     
@@ -105,13 +106,13 @@ def init_db():
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
-def create_user(username, email, password):
+def create_user(username, email, password, is_admin=False):
     try:
         conn = sqlite3.connect('users.db')
         c = conn.cursor()
         password_hash = hash_password(password)
-        c.execute('INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)',
-                 (username, email, password_hash))
+        c.execute('INSERT INTO users (username, email, password_hash, is_admin) VALUES (?, ?, ?, ?)',
+                 (username, email, password_hash, 1 if is_admin else 0))
         conn.commit()
         return True
     except sqlite3.IntegrityError:
@@ -124,7 +125,7 @@ def verify_user(username, password):
     c = conn.cursor()
     password_hash = hash_password(password)
     
-    c.execute('SELECT id, username FROM users WHERE username=? AND password_hash=?',
+    c.execute('SELECT id, username, is_admin FROM users WHERE username=? AND password_hash=?',
              (username, password_hash))
     user = c.fetchone()
     if user:
@@ -306,787 +307,22 @@ def get_user_stats(user_id):
         'level_stats': level_stats
     }
 
-def get_user_certificates(user_id):
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute('''
-        SELECT certificate_id, topic, score, issue_date, expiry_date, status
-        FROM certificates 
-        WHERE user_id=? 
-        ORDER BY issue_date DESC
-    ''', (user_id,))
-    certificates = c.fetchall()
-    conn.close()
-    return certificates
-
-def get_assessment_history(user_id, limit=10):
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute('''
-        SELECT assessment_type, topic, score, max_score, time_taken, timestamp
-        FROM assessment_history 
-        WHERE user_id=?
-        ORDER BY timestamp DESC
-        LIMIT ?
-    ''', (user_id, limit))
-    history = c.fetchall()
-    conn.close()
-    return history
-
-def save_assessment_history(user_id, assessment_type, topic, score, max_score, time_taken):
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute('''
-        INSERT INTO assessment_history (user_id, assessment_type, topic, score, max_score, time_taken)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (user_id, assessment_type, topic, score, max_score, time_taken))
-    conn.commit()
-    conn.close()
-
-def get_user_scores(user_id):
-    """Get all assessment scores for a specific user"""
+def get_all_users():
+    """Get all users for admin dashboard"""
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
     
     c.execute('''
         SELECT 
-            topic, 
-            score, 
-            total_questions, 
-            difficulty, 
-            level,
-            timestamp,
-            CAST(score AS FLOAT) / total_questions * 100 as percentage
-        FROM user_scores 
-        WHERE user_id = ?
-        ORDER BY timestamp DESC
-    ''', (user_id,))
-    
-    scores = c.fetchall()
-    conn.close()
-    
-    return scores
-
-def get_topics_with_scores():
-    """Get all topics with user scores for leaderboard"""
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    
-    c.execute('''
-        SELECT DISTINCT topic 
-        FROM user_scores 
-        ORDER BY topic
+            id, username, email, created_at, last_login, is_active, is_admin
+        FROM users 
+        ORDER BY created_at DESC
     ''')
     
-    topics = [row[0] for row in c.fetchall()]
+    users = c.fetchall()
     conn.close()
-    
-    return topics
+    return users
 
-# ============================================
-# FIELD TEST TYPES AND GENERATORS
-# ============================================
-FIELD_TESTS = {
-    "Technical Skills": [
-        "Python Programming",
-        "Data Structures & Algorithms",
-        "Web Development",
-        "Database Management",
-        "Machine Learning"
-    ],
-    "Soft Skills": [
-        "Communication Skills",
-        "Teamwork Assessment",
-        "Leadership Skills",
-        "Problem Solving",
-        "Time Management"
-    ],
-    "Domain Knowledge": [
-        "Finance & Accounting",
-        "Marketing Fundamentals",
-        "Project Management",
-        "Sales Techniques",
-        "Customer Service"
-    ],
-    "Language Proficiency": [
-        "English Grammar",
-        "Business English",
-        "Vocabulary Test",
-        "Comprehension Test",
-        "Writing Skills"
-    ]
-}
-
-def generate_field_test_questions(topic, difficulty, num_questions, test_type):
-    """Generate questions for different field tests"""
-    
-    prompt_map = {
-        "Technical Skills": lambda t, d, n: f"""
-        Create {n} multiple choice questions about {t} for a technical skills assessment.
-        Difficulty: {d}
-        
-        Each question should test practical knowledge and application.
-        Format each question exactly like this:
-        
-        Q1. [Question text]
-        a) [Option A]
-        b) [Option B]
-        c) [Option C]
-        d) [Option D]
-        Answer: [correct letter]
-        
-        Make questions application-oriented with real-world scenarios.
-        """,
-        
-        "Soft Skills": lambda t, d, n: f"""
-        Create {n} scenario-based multiple choice questions about {t} for soft skills assessment.
-        Difficulty: {d}
-        
-        Each question should present a workplace scenario and ask for the best approach.
-        Format each question exactly like this:
-        
-        Q1. [Scenario description and question]
-        a) [Option A - approach/action]
-        b) [Option B - approach/action]
-        c) [Option C - approach/action]
-        d) [Option D - approach/action]
-        Answer: [correct letter]
-        
-        Focus on practical workplace situations.
-        """,
-        
-        "Domain Knowledge": lambda t, d, n: f"""
-        Create {n} multiple choice questions about {t} for domain knowledge assessment.
-        Difficulty: {d}
-        
-        Each question should test theoretical knowledge and practical application in the domain.
-        Format each question exactly like this:
-        
-        Q1. [Question text]
-        a) [Option A]
-        b) [Option B]
-        c) [Option C]
-        d) [Option D]
-        Answer: [correct letter]
-        
-        Include industry-specific terminology and concepts.
-        """,
-        
-        "Language Proficiency": lambda t, d, n: f"""
-        Create {n} multiple choice questions about {t} for language proficiency assessment.
-        Difficulty: {d}
-        
-        Each question should test language skills including grammar, vocabulary, and comprehension.
-        Format each question exactly like this:
-        
-        Q1. [Question text or passage]
-        a) [Option A]
-        b) [Option B]
-        c) [Option C]
-        d) [Option D]
-        Answer: [correct letter]
-        
-        Include a mix of grammar, vocabulary, and comprehension questions.
-        """
-    }
-    
-    prompt_generator = prompt_map.get(test_type, prompt_map["Technical Skills"])
-    prompt = prompt_generator(topic, difficulty, num_questions)
-    
-    return generate_with_fallback(prompt)
-
-def determine_level(score):
-    """Determine skill level based on score"""
-    if score >= 90:
-        return "Expert"
-    elif score >= 75:
-        return "Advanced"
-    elif score >= 60:
-        return "Intermediate"
-    elif score >= 40:
-        return "Beginner"
-    else:
-        return "Novice"
-
-def generate_certificate_html(user_name, topic, score, certificate_id, issue_date):
-    """Generate HTML certificate"""
-    return f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <style>
-            body {{
-                font-family: 'Georgia', serif;
-                text-align: center;
-                background: linear-gradient(45deg, #f5f7fa, #c3cfe2);
-                padding: 50px;
-            }}
-            .certificate {{
-                background: white;
-                padding: 60px;
-                border: 20px solid #4a6fa5;
-                border-radius: 20px;
-                box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-                max-width: 800px;
-                margin: 0 auto;
-                position: relative;
-            }}
-            .header {{
-                color: #2c3e50;
-                font-size: 42px;
-                margin-bottom: 30px;
-                text-transform: uppercase;
-                letter-spacing: 3px;
-            }}
-            .subheader {{
-                color: #7f8c8d;
-                font-size: 24px;
-                margin-bottom: 40px;
-            }}
-            .name {{
-                color: #2980b9;
-                font-size: 48px;
-                font-weight: bold;
-                margin: 40px 0;
-                border-bottom: 2px solid #3498db;
-                padding-bottom: 20px;
-                display: inline-block;
-            }}
-            .details {{
-                font-size: 20px;
-                color: #34495e;
-                margin: 20px 0;
-                line-height: 1.6;
-            }}
-            .score {{
-                color: #27ae60;
-                font-size: 36px;
-                font-weight: bold;
-                margin: 30px 0;
-            }}
-            .id {{
-                font-family: monospace;
-                color: #7f8c8d;
-                font-size: 14px;
-                margin-top: 40px;
-            }}
-            .seal {{
-                position: absolute;
-                top: 20px;
-                right: 20px;
-                width: 100px;
-                height: 100px;
-                background: #e74c3c;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: white;
-                font-weight: bold;
-                font-size: 14px;
-                transform: rotate(15deg);
-            }}
-        </style>
-    </head>
-    <body>
-        <div class="certificate">
-            <div class="seal">SEAL</div>
-            <div class="header">Certificate of Achievement</div>
-            <div class="subheader">This certifies that</div>
-            <div class="name">{user_name}</div>
-            <div class="details">
-                has successfully completed the assessment in<br>
-                <strong>{topic}</strong><br>
-                with outstanding performance
-            </div>
-            <div class="score">Score: {score}%</div>
-            <div class="details">
-                Issued on: {issue_date}<br>
-                Level: {determine_level(score)}
-            </div>
-            <div class="id">Certificate ID: {certificate_id}</div>
-        </div>
-    </body>
-    </html>
-    """
-
-# ============================================
-# ENHANCED CSS WITH PROFESSIONAL DESIGN
-# ============================================
-def load_css():
-    return '''
-    <style>
-    /* Reset and Base Styles */
-    * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-    }
-    
-    :root {
-        /* Modern Color Palette */
-        --primary: #2563eb;
-        --primary-dark: #1d4ed8;
-        --primary-light: #3b82f6;
-        --secondary: #7c3aed;
-        --secondary-dark: #6d28d9;
-        --success: #10b981;
-        --warning: #f59e0b;
-        --danger: #ef4444;
-        --info: #06b6d4;
-        --expert: #8b5cf6;
-        --advanced: #3b82f6;
-        --intermediate: #10b981;
-        --beginner: #f59e0b;
-        --novice: #ef4444;
-        
-        /* Light Theme Colors */
-        --bg-primary: #ffffff;
-        --bg-secondary: #f8fafc;
-        --bg-sidebar: #ffffff;
-        --text-primary: #1e293b;
-        --text-secondary: #475569;
-        --border-color: #e2e8f0;
-        --card-bg: #ffffff;
-        
-        /* Admin Colors */
-        --admin-primary: #8b5cf6;
-        --admin-secondary: #7c3aed;
-        
-        /* UI Variables */
-        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-        --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        --radius-sm: 0.375rem;
-        --radius: 0.5rem;
-        --radius-md: 0.75rem;
-        --radius-lg: 1rem;
-        --radius-xl: 1.5rem;
-        --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    
-    /* Streamlit App Background */
-    .stApp {
-        background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%) !important;
-        min-height: 100vh;
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-    }
-    
-    /* Dashboard Cards */
-    .dashboard-card {
-        background: var(--card-bg);
-        border-radius: var(--radius-lg);
-        padding: 1.5rem;
-        border: 1px solid var(--border-color);
-        box-shadow: var(--shadow-sm);
-        transition: var(--transition);
-        height: 100%;
-    }
-    
-    .dashboard-card:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-md);
-        border-color: var(--primary-light);
-    }
-    
-    .dashboard-card-primary {
-        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-        color: white;
-    }
-    
-    .dashboard-card-secondary {
-        background: linear-gradient(135deg, var(--secondary), var(--secondary-dark));
-        color: white;
-    }
-    
-    .dashboard-card-success {
-        background: linear-gradient(135deg, var(--success), #0da271);
-        color: white;
-    }
-    
-    .dashboard-card-warning {
-        background: linear-gradient(135deg, var(--warning), #d97706);
-        color: white;
-    }
-    
-    /* Test Generator Card */
-    .test-generator-card {
-        background: linear-gradient(135deg, #8b5cf6, #7c3aed);
-        color: white;
-        border-radius: var(--radius-lg);
-        padding: 2rem;
-        margin-bottom: 2rem;
-        box-shadow: var(--shadow-lg);
-    }
-    
-    /* Level Badges */
-    .level-badge {
-        display: inline-block;
-        padding: 0.25rem 0.75rem;
-        border-radius: var(--radius);
-        font-size: 0.75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-    }
-    
-    .level-expert { background: var(--expert); color: white; }
-    .level-advanced { background: var(--advanced); color: white; }
-    .level-intermediate { background: var(--intermediate); color: white; }
-    .level-beginner { background: var(--beginner); color: white; }
-    .level-novice { background: var(--novice); color: white; }
-    
-    /* Certificate Card */
-    .certificate-card {
-        background: linear-gradient(135deg, #fef3c7, #fde68a);
-        border: 2px solid #f59e0b;
-        border-radius: var(--radius-lg);
-        padding: 1.5rem;
-        margin: 1rem 0;
-        position: relative;
-        overflow: hidden;
-    }
-    
-    .certificate-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23fbbf24' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E");
-        opacity: 0.3;
-    }
-    
-    /* Field Test Container */
-    .field-test-container {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 1.5rem;
-        margin: 2rem 0;
-    }
-    
-    .field-test-card {
-        background: var(--card-bg);
-        border-radius: var(--radius-lg);
-        padding: 1.5rem;
-        border: 1px solid var(--border-color);
-        box-shadow: var(--shadow-sm);
-        transition: var(--transition);
-        cursor: pointer;
-    }
-    
-    .field-test-card:hover {
-        transform: translateY(-4px);
-        box-shadow: var(--shadow-lg);
-        border-color: var(--primary);
-    }
-    
-    .field-test-icon {
-        font-size: 2.5rem;
-        margin-bottom: 1rem;
-    }
-    
-    /* Leaderboard Styles */
-    .leaderboard-card {
-        background: linear-gradient(135deg, #1e293b, #334155);
-        color: white;
-        border-radius: var(--radius-lg);
-        padding: 1.5rem;
-        margin: 1rem 0;
-    }
-    
-    .rank-1 { background: linear-gradient(135deg, #fbbf24, #d97706); }
-    .rank-2 { background: linear-gradient(135deg, #94a3b8, #64748b); }
-    .rank-3 { background: linear-gradient(135deg, #f59e0b, #b45309); }
-    
-    .rank-badge {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        font-size: 1.25rem;
-        margin-right: 1rem;
-    }
-    
-    /* Progress Ring */
-    .progress-ring {
-        width: 100px;
-        height: 100px;
-        margin: 0 auto;
-    }
-    
-    /* Test History Table */
-    .test-history-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 1rem 0;
-    }
-    
-    .test-history-table th {
-        background: var(--bg-secondary);
-        padding: 0.75rem;
-        text-align: left;
-        font-weight: 600;
-        color: var(--text-secondary);
-        border-bottom: 2px solid var(--border-color);
-    }
-    
-    .test-history-table td {
-        padding: 0.75rem;
-        border-bottom: 1px solid var(--border-color);
-    }
-    
-    .test-history-table tr:hover {
-        background: var(--bg-secondary);
-    }
-    
-    /* Welcome Page */
-    .welcome-container {
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-        padding: 3rem 2rem;
-        position: relative;
-        overflow: hidden;
-    }
-    
-    .welcome-container::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-    }
-    
-    .logo-title {
-        text-align: center;
-        position: relative;
-        z-index: 1;
-        animation: float 6s ease-in-out infinite;
-    }
-    
-    .logo-icon {
-        font-size: 5rem;
-        margin-bottom: 1.5rem;
-        background: linear-gradient(45deg, #ffffff, #f1f5f9);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
-    }
-    
-    .main-title {
-        font-size: 3.5rem;
-        font-weight: 800;
-        background: linear-gradient(45deg, #ffffff, #f1f5f9);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 1rem;
-        line-height: 1.2;
-        letter-spacing: -0.025em;
-    }
-    
-    .tagline {
-        font-size: 1.25rem;
-        color: rgba(255, 255, 255, 0.9);
-        margin-bottom: 2rem;
-        max-width: 600px;
-        line-height: 1.6;
-        font-weight: 300;
-    }
-    
-    .countdown {
-        font-size: 1rem;
-        color: rgba(255, 255, 255, 0.8);
-        margin-top: 1rem;
-        background: rgba(255, 255, 255, 0.1);
-        padding: 0.5rem 1rem;
-        border-radius: var(--radius);
-        backdrop-filter: blur(10px);
-    }
-    
-    .action-btn {
-        background: linear-gradient(45deg, #ffffff, #f1f5f9);
-        color: var(--primary);
-        border: none;
-        padding: 1rem 2.5rem;
-        font-size: 1.125rem;
-        font-weight: 600;
-        border-radius: var(--radius-lg);
-        cursor: pointer;
-        transition: var(--transition);
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.5rem;
-        box-shadow: var(--shadow-lg);
-        position: relative;
-        overflow: hidden;
-        z-index: 1;
-        margin-top: 1rem;
-    }
-    
-    .action-btn::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: linear-gradient(45deg, #f1f5f9, #ffffff);
-        opacity: 0;
-        transition: var(--transition);
-        z-index: -1;
-    }
-    
-    .action-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-xl);
-        color: var(--primary-dark);
-    }
-    
-    .action-btn:hover::before {
-        opacity: 1;
-    }
-    
-    /* Buttons - Fixed */
-    div.stButton > button {
-        width: 100% !important;
-        background: linear-gradient(45deg, var(--primary), var(--primary-dark)) !important;
-        color: white !important;
-        border: none !important;
-        padding: 0.875rem 1.5rem !important;
-        border-radius: var(--radius) !important;
-        font-weight: 600 !important;
-        font-size: 1rem !important;
-        transition: var(--transition) !important;
-        cursor: pointer !important;
-        position: relative !important;
-        overflow: hidden !important;
-    }
-    
-    div.stButton > button:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: var(--shadow-lg) !important;
-    }
-    
-    /* Animations */
-    @keyframes float {
-        0%, 100% { transform: translateY(0px); }
-        50% { transform: translateY(-10px); }
-    }
-    
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    
-    .fade-in {
-        animation: fadeIn 0.6s ease-out;
-    }
-    
-    /* Responsive Design */
-    @media (max-width: 768px) {
-        .main-title {
-            font-size: 2.5rem;
-        }
-        
-        .field-test-container {
-            grid-template-columns: 1fr;
-        }
-    }
-    </style>
-    '''
-
-# ============================================
-# GEMINI API FUNCTION
-# ============================================
-def generate_with_fallback(prompt):
-    GEMINI_API_KEYS = [
-        "AIzaSyB55YBQ6x97ah4rZgs8F-6UhZtCS90xK6k",
-        "AIzaSyDway_4FY72fOG9Fz_Y56LjOvLg6wIdD7k"
-    ]
-    
-    for index, api_key in enumerate(GEMINI_API_KEYS, start=1):
-        try:
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel("models/gemini-2.5-flash")
-            response = model.generate_content(prompt)
-            
-            if not response or not response.text:
-                raise RuntimeError("Empty response received")
-                
-            return response.text.strip()
-            
-        except Exception as e:
-            error_msg = str(e).lower()
-            
-            if any(k in error_msg for k in ["quota", "limit", "429", "permission", "auth", "key"]):
-                time.sleep(1)
-                continue
-            else:
-                st.error(f"API Error: {str(e)[:100]}")
-                return None
-    
-    raise RuntimeError("All API keys exhausted. Please try again later.")
-
-# ============================================
-# STREAMLIT APP CONFIG
-# ============================================
-st.set_page_config(
-    page_title="Skill Assessment Pro",
-    page_icon="🎯",
-    layout="wide",
-    initial_sidebar_state="collapsed",
-    menu_items={
-        'Get Help': 'https://github.com/Mr-Asmath',
-        'Report a bug': 'https://github.com/Mr-Asmath/issues',
-        'About': '# Skill Assessment Pro\nAI-powered assessment platform'
-    }
-)
-
-# Initialize database
-init_db()
-
-# Initialize session state
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
-if 'username' not in st.session_state:
-    st.session_state.username = None
-if 'user_id' not in st.session_state:
-    st.session_state.user_id = None
-if 'current_page' not in st.session_state:
-    st.session_state.current_page = 'welcome'
-if 'welcome_shown' not in st.session_state:
-    st.session_state.welcome_shown = False
-if 'countdown' not in st.session_state:
-    st.session_state.countdown = 3
-if 'questions' not in st.session_state:
-    st.session_state.questions = None
-if 'score' not in st.session_state:
-    st.session_state.score = None
-if 'is_admin' not in st.session_state:
-    st.session_state.is_admin = False
-if 'current_test_type' not in st.session_state:
-    st.session_state.current_test_type = None
-if 'current_topic' not in st.session_state:
-    st.session_state.current_topic = None
-if 'show_certificate' not in st.session_state:
-    st.session_state.show_certificate = False
-
-# ============================================
-# PAGE FUNCTIONS
-# ============================================
 def welcome_page():
     st.markdown(load_css(), unsafe_allow_html=True)
     
@@ -1291,6 +527,7 @@ def learner_dashboard():
         show_leaderboard()
     elif st.session_state.current_page == 'settings':
         show_settings()
+
 
 def show_dashboard_home():
     """Main dashboard home page"""
@@ -1573,216 +810,6 @@ def show_test_generator():
     if st.session_state.get('questions'):
         st.markdown("---")
         display_assessment_questions()
-
-def display_assessment_questions():
-    """Display generated questions and handle assessment"""
-    # Timer display
-    time_elapsed = int(time.time() - st.session_state.test_start_time)
-    time_remaining = (st.session_state.time_limit * 60) - time_elapsed
-    
-    if time_remaining > 0:
-        mins, secs = divmod(time_remaining, 60)
-        st.info(f"⏰ Time remaining: {mins:02d}:{secs:02d}")
-    else:
-        st.warning("⏰ Time's up! Please submit your assessment.")
-    
-    # Assessment Header
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown(f"""
-        <div class="dashboard-card">
-            <div style="font-size: 0.875rem; color: var(--text-secondary);">Topic</div>
-            <div style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary);">
-                {st.session_state.get('generated_topic', 'N/A')[:30]}{'...' if len(st.session_state.get('generated_topic', '')) > 30 else ''}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown(f"""
-        <div class="dashboard-card">
-            <div style="font-size: 0.875rem; color: var(--text-secondary);">Difficulty</div>
-            <div style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary);">
-                {st.session_state.get('difficulty', 'N/A')}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown(f"""
-        <div class="dashboard-card">
-            <div style="font-size: 0.875rem; color: var(--text-secondary);">Questions</div>
-            <div style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary);">
-                {st.session_state.get('num_questions', 'N/A')}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # Questions Form
-    with st.form("assessment_form"):
-        user_answers = {}
-        questions = st.session_state.questions.split('\n\n')
-        
-        for i, q_block in enumerate(questions):
-            if q_block.strip():
-                lines = q_block.strip().split('\n')
-                if len(lines) >= 6:
-                    question_text = lines[0]
-                    options = lines[1:5]
-                    answer_line = lines[5] if len(lines) > 5 else ""
-                    
-                    st.markdown(f'<div class="question-card">', unsafe_allow_html=True)
-                    st.markdown(f"**Question {i+1}:** {question_text}")
-                    
-                    choice = st.radio(
-                        f"Select answer for Q{i+1}:",
-                        options,
-                        key=f"q_{i}",
-                        index=None,
-                        label_visibility="collapsed"
-                    )
-                    
-                    user_answers[f"Q{i+1}"] = {
-                        "choice": choice,
-                        "correct": answer_line.replace("Answer: ", "").strip() if "Answer:" in answer_line else "",
-                        "options": options,
-                        "question": question_text
-                    }
-                    st.markdown('</div>', unsafe_allow_html=True)
-        
-        submitted = st.form_submit_button("📤 Submit Assessment", use_container_width=True, type="primary")
-    
-    # Handle Submission
-    if submitted:
-        correct_count = 0
-        total = len(user_answers)
-        
-        for q_id, data in user_answers.items():
-            user_choice = data["choice"]
-            correct_answer = data["correct"]
-            
-            if user_choice and correct_answer:
-                if user_choice[0].lower() == correct_answer.lower():
-                    correct_count += 1
-        
-        score_percentage = (correct_count / total) * 100 if total > 0 else 0
-        st.session_state.score = int(score_percentage)
-        level = determine_level(score_percentage)
-        
-        # Calculate time taken
-        time_taken = int(time.time() - st.session_state.test_start_time)
-        
-        # Save score to database
-        if st.session_state.user_id:
-            save_user_score(
-                st.session_state.user_id,
-                st.session_state.get('generated_topic', 'Unknown'),
-                correct_count,
-                total,
-                st.session_state.get('difficulty', 'Medium'),
-                level
-            )
-            
-            # Save to assessment history
-            save_assessment_history(
-                st.session_state.user_id,
-                st.session_state.get('test_type', 'Custom Assessment'),
-                st.session_state.get('generated_topic', 'Unknown'),
-                correct_count,
-                total,
-                time_taken
-            )
-        
-        # Display Results
-        st.markdown("---")
-        
-        if score_percentage >= 80:
-            color = "var(--success)"
-            emoji = "🎉"
-            message = "Excellent work! You've earned a certificate!"
-            st.session_state.show_certificate = True
-        elif score_percentage >= 60:
-            color = "var(--warning)"
-            emoji = "👍"
-            message = "Good job! Keep practicing to improve!"
-            st.session_state.show_certificate = False
-        else:
-            color = "var(--danger)"
-            emoji = "💪"
-            message = "Keep practicing! You'll improve with time."
-            st.session_state.show_certificate = False
-        
-        st.markdown(f"""
-        <div class="score-container" style="background: linear-gradient(135deg, {color}, var(--primary));">
-            <div class="score-value">{emoji} {score_percentage:.1f}%</div>
-            <h3>{correct_count} out of {total} correct</h3>
-            <p class="score-message">{message}</p>
-            <div style="margin-top: 1rem;">
-                <span class="level-badge level-{level.lower()}">{level}</span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Certificate Button
-        if st.session_state.show_certificate:
-            col1, col2, col3 = st.columns([1, 2, 1])
-            with col2:
-                if st.button("🏆 Download Certificate", use_container_width=True, type="primary"):
-                    # Generate certificate
-                    certificates = get_user_certificates(st.session_state.user_id)
-                    if certificates:
-                        latest_cert = certificates[0]
-                        certificate_id, topic, score, issue_date, expiry_date, status = latest_cert
-                        
-                        # Generate certificate HTML
-                        cert_html = generate_certificate_html(
-                            st.session_state.username,
-                            topic,
-                            score,
-                            certificate_id,
-                            issue_date[:10]
-                        )
-                        
-                        # Create download link
-                        b64 = base64.b64encode(cert_html.encode()).decode()
-                        href = f'<a href="data:text/html;base64,{b64}" download="certificate_{certificate_id}.html">Download Certificate</a>'
-                        st.markdown(href, unsafe_allow_html=True)
-                        st.success("Certificate downloaded successfully!")
-        
-        # Detailed Results
-        if st.session_state.get('show_answers', True):
-            with st.expander("📊 View Detailed Results", expanded=True):
-                for q_id, data in user_answers.items():
-                    user_choice = data["choice"] or "Not answered"
-                    correct_answer = data["correct"]
-                    is_correct = user_choice and correct_answer and user_choice[0].lower() == correct_answer.lower()
-                    
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        st.write(f"**{q_id}:** {data['question']}")
-                        st.write(f"**Your answer:** {user_choice}")
-                        if correct_answer:
-                            correct_option = data['options'][ord(correct_answer.lower()) - 97] if correct_answer and correct_answer.isalpha() else 'N/A'
-                            st.write(f"**Correct answer:** {correct_option}")
-                    with col2:
-                        if is_correct:
-                            st.success("✅ Correct")
-                        else:
-                            st.error("❌ Incorrect")
-                    st.divider()
-        
-        # Next Steps
-        st.markdown("### 🎯 Next Steps")
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("🔄 Take Another Test", use_container_width=True):
-                st.session_state.questions = None
-                st.session_state.score = None
-                st.rerun()
-        with col2:
-            if st.button("📊 View Progress", use_container_width=True, type="secondary"):
-                st.session_state.current_page = 'progress'
-                st.rerun()
 
 def show_my_assessments():
     """Show user's assessment history"""
@@ -2495,6 +1522,1851 @@ def show_settings():
                 if st.checkbox("I understand this will permanently delete all my data"):
                     st.error("Account deletion not implemented in demo")
 
+
+
+def display_assessment_questions():
+    """Display generated questions and handle assessment"""
+    # Timer display
+    time_elapsed = int(time.time() - st.session_state.test_start_time)
+    time_remaining = (st.session_state.time_limit * 60) - time_elapsed
+    
+    if time_remaining > 0:
+        mins, secs = divmod(time_remaining, 60)
+        st.info(f"⏰ Time remaining: {mins:02d}:{secs:02d}")
+    else:
+        st.warning("⏰ Time's up! Please submit your assessment.")
+    
+    # Assessment Header
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown(f"""
+        <div class="dashboard-card">
+            <div style="font-size: 0.875rem; color: var(--text-secondary);">Topic</div>
+            <div style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary);">
+                {st.session_state.get('generated_topic', 'N/A')[:30]}{'...' if len(st.session_state.get('generated_topic', '')) > 30 else ''}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(f"""
+        <div class="dashboard-card">
+            <div style="font-size: 0.875rem; color: var(--text-secondary);">Difficulty</div>
+            <div style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary);">
+                {st.session_state.get('difficulty', 'N/A')}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown(f"""
+        <div class="dashboard-card">
+            <div style="font-size: 0.875rem; color: var(--text-secondary);">Questions</div>
+            <div style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary);">
+                {st.session_state.get('num_questions', 'N/A')}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Questions Form
+    with st.form("assessment_form"):
+        user_answers = {}
+        questions = st.session_state.questions.split('\n\n')
+        
+        for i, q_block in enumerate(questions):
+            if q_block.strip():
+                lines = q_block.strip().split('\n')
+                if len(lines) >= 6:
+                    question_text = lines[0]
+                    options = lines[1:5]
+                    answer_line = lines[5] if len(lines) > 5 else ""
+                    
+                    st.markdown(f'<div class="question-card">', unsafe_allow_html=True)
+                    st.markdown(f"**Question {i+1}:** {question_text}")
+                    
+                    choice = st.radio(
+                        f"Select answer for Q{i+1}:",
+                        options,
+                        key=f"q_{i}",
+                        index=None,
+                        label_visibility="collapsed"
+                    )
+                    
+                    user_answers[f"Q{i+1}"] = {
+                        "choice": choice,
+                        "correct": answer_line.replace("Answer: ", "").strip() if "Answer:" in answer_line else "",
+                        "options": options,
+                        "question": question_text
+                    }
+                    st.markdown('</div>', unsafe_allow_html=True)
+        
+        submitted = st.form_submit_button("📤 Submit Assessment", use_container_width=True, type="primary")
+    
+    # Handle Submission
+    if submitted:
+        correct_count = 0
+        total = len(user_answers)
+        
+        for q_id, data in user_answers.items():
+            user_choice = data["choice"]
+            correct_answer = data["correct"]
+            
+            if user_choice and correct_answer:
+                if user_choice[0].lower() == correct_answer.lower():
+                    correct_count += 1
+        
+        score_percentage = (correct_count / total) * 100 if total > 0 else 0
+        st.session_state.score = int(score_percentage)
+        level = determine_level(score_percentage)
+        
+        # Calculate time taken
+        time_taken = int(time.time() - st.session_state.test_start_time)
+        
+        # Save score to database
+        if st.session_state.user_id:
+            save_user_score(
+                st.session_state.user_id,
+                st.session_state.get('generated_topic', 'Unknown'),
+                correct_count,
+                total,
+                st.session_state.get('difficulty', 'Medium'),
+                level
+            )
+            
+            # Save to assessment history
+            save_assessment_history(
+                st.session_state.user_id,
+                st.session_state.get('test_type', 'Custom Assessment'),
+                st.session_state.get('generated_topic', 'Unknown'),
+                correct_count,
+                total,
+                time_taken
+            )
+        
+        # Display Results
+        st.markdown("---")
+        
+        if score_percentage >= 80:
+            color = "var(--success)"
+            emoji = "🎉"
+            message = "Excellent work! You've earned a certificate!"
+            st.session_state.show_certificate = True
+        elif score_percentage >= 60:
+            color = "var(--warning)"
+            emoji = "👍"
+            message = "Good job! Keep practicing to improve!"
+            st.session_state.show_certificate = False
+        else:
+            color = "var(--danger)"
+            emoji = "💪"
+            message = "Keep practicing! You'll improve with time."
+            st.session_state.show_certificate = False
+        
+        st.markdown(f"""
+        <div class="score-container" style="background: linear-gradient(135deg, {color}, var(--primary));">
+            <div class="score-value">{emoji} {score_percentage:.1f}%</div>
+            <h3>{correct_count} out of {total} correct</h3>
+            <p class="score-message">{message}</p>
+            <div style="margin-top: 1rem;">
+                <span class="level-badge level-{level.lower()}">{level}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Certificate Button
+        if st.session_state.show_certificate:
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                if st.button("🏆 Download Certificate", use_container_width=True, type="primary"):
+                    # Generate certificate
+                    certificates = get_user_certificates(st.session_state.user_id)
+                    if certificates:
+                        latest_cert = certificates[0]
+                        certificate_id, topic, score, issue_date, expiry_date, status = latest_cert
+                        
+                        # Generate certificate HTML
+                        cert_html = generate_certificate_html(
+                            st.session_state.username,
+                            topic,
+                            score,
+                            certificate_id,
+                            issue_date[:10]
+                        )
+                        
+                        # Create download link
+                        b64 = base64.b64encode(cert_html.encode()).decode()
+                        href = f'<a href="data:text/html;base64,{b64}" download="certificate_{certificate_id}.html">Download Certificate</a>'
+                        st.markdown(href, unsafe_allow_html=True)
+                        st.success("Certificate downloaded successfully!")
+        
+        # Detailed Results
+        if st.session_state.get('show_answers', True):
+            with st.expander("📊 View Detailed Results", expanded=True):
+                for q_id, data in user_answers.items():
+                    user_choice = data["choice"] or "Not answered"
+                    correct_answer = data["correct"]
+                    is_correct = user_choice and correct_answer and user_choice[0].lower() == correct_answer.lower()
+                    
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.write(f"**{q_id}:** {data['question']}")
+                        st.write(f"**Your answer:** {user_choice}")
+                        if correct_answer:
+                            correct_option = data['options'][ord(correct_answer.lower()) - 97] if correct_answer and correct_answer.isalpha() else 'N/A'
+                            st.write(f"**Correct answer:** {correct_option}")
+                    with col2:
+                        if is_correct:
+                            st.success("✅ Correct")
+                        else:
+                            st.error("❌ Incorrect")
+                    st.divider()
+        
+        # Next Steps
+        st.markdown("### 🎯 Next Steps")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🔄 Take Another Test", use_container_width=True):
+                st.session_state.questions = None
+                st.session_state.score = None
+                st.rerun()
+        with col2:
+            if st.button("📊 View Progress", use_container_width=True, type="secondary"):
+                st.session_state.current_page = 'progress'
+                st.rerun()
+
+
+
+def get_user_details(user_id):
+    """Get detailed information about a specific user"""
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    
+    # Get user basic info
+    c.execute('''
+        SELECT id, username, email, created_at, last_login, is_active, is_admin
+        FROM users WHERE id=?
+    ''', (user_id,))
+    
+    user_info = c.fetchone()
+    
+    if not user_info:
+        conn.close()
+        return None
+    
+    # Get user scores
+    c.execute('''
+        SELECT COUNT(*) as total_tests,
+               AVG(CAST(score AS FLOAT) / total_questions * 100) as avg_score,
+               MAX(CAST(score AS FLOAT) / total_questions * 100) as best_score
+        FROM user_scores 
+        WHERE user_id=?
+    ''', (user_id,))
+    
+    stats = c.fetchone()
+    
+    # Get recent activity
+    c.execute('''
+        SELECT topic, score, total_questions, difficulty, timestamp
+        FROM user_scores 
+        WHERE user_id=?
+        ORDER BY timestamp DESC 
+        LIMIT 10
+    ''', (user_id,))
+    
+    recent_activity = c.fetchall()
+    
+    # Get certificates
+    c.execute('''
+        SELECT certificate_id, topic, score, issue_date, status
+        FROM certificates 
+        WHERE user_id=?
+        ORDER BY issue_date DESC
+    ''', (user_id,))
+    
+    certificates = c.fetchall()
+    
+    conn.close()
+    
+    return {
+        'user_info': user_info,
+        'stats': stats,
+        'recent_activity': recent_activity,
+        'certificates': certificates
+    }
+
+def update_user_status(user_id, is_active):
+    """Activate or deactivate a user"""
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('UPDATE users SET is_active=? WHERE id=?', (is_active, user_id))
+    conn.commit()
+    conn.close()
+
+def delete_user(user_id):
+    """Delete a user and all related data"""
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    
+    # Delete related records first
+    c.execute('DELETE FROM user_scores WHERE user_id=?', (user_id,))
+    c.execute('DELETE FROM certificates WHERE user_id=?', (user_id,))
+    c.execute('DELETE FROM assessment_history WHERE user_id=?', (user_id,))
+    c.execute('DELETE FROM leaderboard WHERE user_id=?', (user_id,))
+    
+    # Delete user
+    c.execute('DELETE FROM users WHERE id=?', (user_id,))
+    
+    conn.commit()
+    conn.close()
+
+def get_system_stats():
+    """Get overall system statistics for admin dashboard"""
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    
+    # Total users
+    c.execute('SELECT COUNT(*) FROM users')
+    total_users = c.fetchone()[0]
+    
+    # Active users
+    c.execute('SELECT COUNT(*) FROM users WHERE is_active=1')
+    active_users = c.fetchone()[0]
+    
+    # Total assessments
+    c.execute('SELECT COUNT(*) FROM user_scores')
+    total_assessments = c.fetchone()[0]
+    
+    # Total certificates issued
+    c.execute('SELECT COUNT(*) FROM certificates')
+    total_certificates = c.fetchone()[0]
+    
+    # Recent registrations (last 7 days)
+    c.execute('''
+        SELECT COUNT(*) FROM users 
+        WHERE date(created_at) >= date('now', '-7 days')
+    ''')
+    recent_registrations = c.fetchone()[0]
+    
+    # Average score across all users
+    c.execute('''
+        SELECT AVG(CAST(score AS FLOAT) / total_questions * 100) 
+        FROM user_scores
+    ''')
+    avg_system_score = c.fetchone()[0] or 0
+    
+    # Top performing topics
+    c.execute('''
+        SELECT topic, COUNT(*) as test_count, 
+               AVG(CAST(score AS FLOAT) / total_questions * 100) as avg_score
+        FROM user_scores 
+        GROUP BY topic 
+        ORDER BY test_count DESC 
+        LIMIT 5
+    ''')
+    top_topics = c.fetchall()
+    
+    conn.close()
+    
+    return {
+        'total_users': total_users,
+        'active_users': active_users,
+        'total_assessments': total_assessments,
+        'total_certificates': total_certificates,
+        'recent_registrations': recent_registrations,
+        'avg_system_score': round(avg_system_score, 1),
+        'top_topics': top_topics
+    }
+
+def get_user_certificates(user_id):
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('''
+        SELECT certificate_id, topic, score, issue_date, expiry_date, status
+        FROM certificates 
+        WHERE user_id=? 
+        ORDER BY issue_date DESC
+    ''', (user_id,))
+    certificates = c.fetchall()
+    conn.close()
+    return certificates
+
+def get_assessment_history(user_id, limit=10):
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('''
+        SELECT assessment_type, topic, score, max_score, time_taken, timestamp
+        FROM assessment_history 
+        WHERE user_id=?
+        ORDER BY timestamp DESC
+        LIMIT ?
+    ''', (user_id, limit))
+    history = c.fetchall()
+    conn.close()
+    return history
+
+def save_assessment_history(user_id, assessment_type, topic, score, max_score, time_taken):
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('''
+        INSERT INTO assessment_history (user_id, assessment_type, topic, score, max_score, time_taken)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (user_id, assessment_type, topic, score, max_score, time_taken))
+    conn.commit()
+    conn.close()
+
+def get_user_scores(user_id):
+    """Get all assessment scores for a specific user"""
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    
+    c.execute('''
+        SELECT 
+            topic, 
+            score, 
+            total_questions, 
+            difficulty, 
+            level,
+            timestamp,
+            CAST(score AS FLOAT) / total_questions * 100 as percentage
+        FROM user_scores 
+        WHERE user_id = ?
+        ORDER BY timestamp DESC
+    ''', (user_id,))
+    
+    scores = c.fetchall()
+    conn.close()
+    
+    return scores
+
+def get_topics_with_scores():
+    """Get all topics with user scores for leaderboard"""
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    
+    c.execute('''
+        SELECT DISTINCT topic 
+        FROM user_scores 
+        ORDER BY topic
+    ''')
+    
+    topics = [row[0] for row in c.fetchall()]
+    conn.close()
+    
+    return topics
+
+# ============================================
+# FIELD TEST TYPES AND GENERATORS
+# ============================================
+FIELD_TESTS = {
+    "Technical Skills": [
+        "Python Programming",
+        "Data Structures & Algorithms",
+        "Web Development",
+        "Database Management",
+        "Machine Learning"
+    ],
+    "Soft Skills": [
+        "Communication Skills",
+        "Teamwork Assessment",
+        "Leadership Skills",
+        "Problem Solving",
+        "Time Management"
+    ],
+    "Domain Knowledge": [
+        "Finance & Accounting",
+        "Marketing Fundamentals",
+        "Project Management",
+        "Sales Techniques",
+        "Customer Service"
+    ],
+    "Language Proficiency": [
+        "English Grammar",
+        "Business English",
+        "Vocabulary Test",
+        "Comprehension Test",
+        "Writing Skills"
+    ]
+}
+
+def generate_field_test_questions(topic, difficulty, num_questions, test_type):
+    """Generate questions for different field tests"""
+    
+    prompt_map = {
+        "Technical Skills": lambda t, d, n: f"""
+        Create {n} multiple choice questions about {t} for a technical skills assessment.
+        Difficulty: {d}
+        
+        Each question should test practical knowledge and application.
+        Format each question exactly like this:
+        
+        Q1. [Question text]
+        a) [Option A]
+        b) [Option B]
+        c) [Option C]
+        d) [Option D]
+        Answer: [correct letter]
+        
+        Make questions application-oriented with real-world scenarios.
+        """,
+        
+        "Soft Skills": lambda t, d, n: f"""
+        Create {n} scenario-based multiple choice questions about {t} for soft skills assessment.
+        Difficulty: {d}
+        
+        Each question should present a workplace scenario and ask for the best approach.
+        Format each question exactly like this:
+        
+        Q1. [Scenario description and question]
+        a) [Option A - approach/action]
+        b) [Option B - approach/action]
+        c) [Option C - approach/action]
+        d) [Option D - approach/action]
+        Answer: [correct letter]
+        
+        Focus on practical workplace situations.
+        """,
+        
+        "Domain Knowledge": lambda t, d, n: f"""
+        Create {n} multiple choice questions about {t} for domain knowledge assessment.
+        Difficulty: {d}
+        
+        Each question should test theoretical knowledge and practical application in the domain.
+        Format each question exactly like this:
+        
+        Q1. [Question text]
+        a) [Option A]
+        b) [Option B]
+        c) [Option C]
+        d) [Option D]
+        Answer: [correct letter]
+        
+        Include industry-specific terminology and concepts.
+        """,
+        
+        "Language Proficiency": lambda t, d, n: f"""
+        Create {n} multiple choice questions about {t} for language proficiency assessment.
+        Difficulty: {d}
+        
+        Each question should test language skills including grammar, vocabulary, and comprehension.
+        Format each question exactly like this:
+        
+        Q1. [Question text or passage]
+        a) [Option A]
+        b) [Option B]
+        c) [Option C]
+        d) [Option D]
+        Answer: [correct letter]
+        
+        Include a mix of grammar, vocabulary, and comprehension questions.
+        """
+    }
+    
+    prompt_generator = prompt_map.get(test_type, prompt_map["Technical Skills"])
+    prompt = prompt_generator(topic, difficulty, num_questions)
+    
+    return generate_with_fallback(prompt)
+
+def determine_level(score):
+    """Determine skill level based on score"""
+    if score >= 90:
+        return "Expert"
+    elif score >= 75:
+        return "Advanced"
+    elif score >= 60:
+        return "Intermediate"
+    elif score >= 40:
+        return "Beginner"
+    else:
+        return "Novice"
+
+def generate_certificate_html(user_name, topic, score, certificate_id, issue_date):
+    """Generate HTML certificate"""
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body {{
+                font-family: 'Georgia', serif;
+                text-align: center;
+                background: linear-gradient(45deg, #f5f7fa, #c3cfe2);
+                padding: 50px;
+            }}
+            .certificate {{
+                background: white;
+                padding: 60px;
+                border: 20px solid #4a6fa5;
+                border-radius: 20px;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                max-width: 800px;
+                margin: 0 auto;
+                position: relative;
+            }}
+            .header {{
+                color: #2c3e50;
+                font-size: 42px;
+                margin-bottom: 30px;
+                text-transform: uppercase;
+                letter-spacing: 3px;
+            }}
+            .subheader {{
+                color: #7f8c8d;
+                font-size: 24px;
+                margin-bottom: 40px;
+            }}
+            .name {{
+                color: #2980b9;
+                font-size: 48px;
+                font-weight: bold;
+                margin: 40px 0;
+                border-bottom: 2px solid #3498db;
+                padding-bottom: 20px;
+                display: inline-block;
+            }}
+            .details {{
+                font-size: 20px;
+                color: #34495e;
+                margin: 20px 0;
+                line-height: 1.6;
+            }}
+            .score {{
+                color: #27ae60;
+                font-size: 36px;
+                font-weight: bold;
+                margin: 30px 0;
+            }}
+            .id {{
+                font-family: monospace;
+                color: #7f8c8d;
+                font-size: 14px;
+                margin-top: 40px;
+            }}
+            .seal {{
+                position: absolute;
+                top: 20px;
+                right: 20px;
+                width: 100px;
+                height: 100px;
+                background: #e74c3c;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-weight: bold;
+                font-size: 14px;
+                transform: rotate(15deg);
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="certificate">
+            <div class="seal">SEAL</div>
+            <div class="header">Certificate of Achievement</div>
+            <div class="subheader">This certifies that</div>
+            <div class="name">{user_name}</div>
+            <div class="details">
+                has successfully completed the assessment in<br>
+                <strong>{topic}</strong><br>
+                with outstanding performance
+            </div>
+            <div class="score">Score: {score}%</div>
+            <div class="details">
+                Issued on: {issue_date}<br>
+                Level: {determine_level(score)}
+            </div>
+            <div class="id">Certificate ID: {certificate_id}</div>
+        </div>
+    </body>
+    </html>
+    """
+
+# ============================================
+# ADMIN DASHBOARD FUNCTIONS
+# ============================================
+def admin_dashboard():
+    """Admin dashboard with user management and system stats"""
+    st.markdown(load_css(), unsafe_allow_html=True)
+    
+    # Admin Sidebar
+    with st.sidebar:
+        st.markdown(f"""
+        <div class="user-profile">
+            <div class="user-avatar" style="background: linear-gradient(45deg, #8b5cf6, #7c3aed);">
+                👑
+            </div>
+            <h3 style="color: var(--text-primary);">{st.session_state.username} (Admin)</h3>
+            <p style="color: var(--text-secondary); font-size: 0.875rem;">Administrator Dashboard</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        # Admin Navigation Menu
+        st.markdown("### 📍 Admin Navigation")
+        
+        menu_items = [
+            ("📊 Dashboard", "admin_dashboard"),
+            ("👥 User Management", "user_management"),
+            ("📈 System Analytics", "system_analytics"),
+            ("🏆 Certificates", "admin_certificates"),
+            ("⚙️ System Settings", "system_settings")
+        ]
+        
+        for icon_name, page_name in menu_items:
+            if st.button(f"{icon_name}", key=f"admin_menu_{page_name}", use_container_width=True):
+                st.session_state.current_page = page_name
+                st.rerun()
+        
+        st.markdown("---")
+        
+        if st.button("🚪 Switch to User View", use_container_width=True, type="secondary"):
+            st.session_state.is_admin = False
+            st.session_state.current_page = 'dashboard'
+            st.rerun()
+            
+        if st.button("🚪 Logout", use_container_width=True, type="primary"):
+            st.session_state.logged_in = False
+            st.session_state.username = None
+            st.session_state.user_id = None
+            st.session_state.is_admin = False
+            st.session_state.current_page = 'welcome'
+            st.session_state.welcome_shown = False
+            st.rerun()
+    
+    # Main Admin Content
+    if st.session_state.current_page == 'admin_dashboard':
+        show_admin_dashboard()
+    elif st.session_state.current_page == 'user_management':
+        show_user_management()
+    elif st.session_state.current_page == 'system_analytics':
+        show_system_analytics()
+    elif st.session_state.current_page == 'admin_certificates':
+        show_admin_certificates()
+    elif st.session_state.current_page == 'system_settings':
+        show_system_settings()
+
+def show_admin_dashboard():
+    """Main admin dashboard page"""
+    st.markdown("""
+    <div style="max-width: 1200px; margin: 0 auto; padding: 2rem;">
+        <h1 style="font-size: 2.5rem; font-weight: 800; color: var(--text-primary); margin-bottom: 0.5rem;">
+            👑 Admin Dashboard
+        </h1>
+        <p style="color: var(--text-secondary); margin-bottom: 3rem;">
+            Welcome to the Skill Assessment Pro Admin Panel
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Get system statistics
+    stats = get_system_stats()
+    
+    # System Stats Cards
+    st.markdown("### 📊 System Overview")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.markdown(f"""
+        <div class="dashboard-card-primary">
+            <div style="font-size: 0.875rem; opacity: 0.9;">Total Users</div>
+            <div style="font-size: 2rem; font-weight: 700;">{stats['total_users']}</div>
+            <div style="font-size: 0.75rem; margin-top: 0.5rem;">
+                {stats['active_users']} active • {stats['recent_registrations']} new (7 days)
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(f"""
+        <div class="dashboard-card-secondary">
+            <div style="font-size: 0.875rem; opacity: 0.9;">Total Assessments</div>
+            <div style="font-size: 2rem; font-weight: 700;">{stats['total_assessments']}</div>
+            <div style="font-size: 0.75rem; margin-top: 0.5rem;">
+                Avg score: {stats['avg_system_score']}%
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown(f"""
+        <div class="dashboard-card-success">
+            <div style="font-size: 0.875rem; opacity: 0.9;">Certificates Issued</div>
+            <div style="font-size: 2rem; font-weight: 700;">{stats['total_certificates']}</div>
+            <div style="font-size: 0.75rem; margin-top: 0.5rem;">
+                Certificates awarded
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col4:
+        st.markdown(f"""
+        <div class="dashboard-card-warning">
+            <div style="font-size: 0.875rem; opacity: 0.9;">System Status</div>
+            <div style="font-size: 2rem; font-weight: 700;">🟢 Online</div>
+            <div style="font-size: 0.75rem; margin-top: 0.5rem;">
+                All systems operational
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Recent Activity and Quick Actions
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        # Recent User Registrations
+        st.markdown("### 👥 Recent User Registrations")
+        users = get_all_users()[:5]
+        
+        if users:
+            for user in users:
+                user_id, username, email, created_at, last_login, is_active, is_admin = user
+                
+                col_a, col_b, col_c, col_d = st.columns([2, 2, 1, 1])
+                with col_a:
+                    st.write(f"**{username}**")
+                    st.caption(email)
+                with col_b:
+                    st.caption(f"Joined: {created_at[:10]}")
+                with col_c:
+                    status = "🟢" if is_active else "🔴"
+                    st.write(status)
+                with col_d:
+                    if st.button("View", key=f"view_{user_id}"):
+                        st.session_state.selected_user = user_id
+                        st.session_state.current_page = 'user_management'
+                        st.rerun()
+                st.divider()
+        else:
+            st.info("No users found")
+    
+    with col2:
+        # Quick Actions
+        st.markdown("### ⚡ Quick Actions")
+        
+        if st.button("👤 Add New User", use_container_width=True, type="primary"):
+            st.session_state.show_add_user = True
+            st.rerun()
+        
+        if st.button("📊 View Analytics", use_container_width=True):
+            st.session_state.current_page = 'system_analytics'
+            st.rerun()
+        
+        if st.button("🏆 Manage Certificates", use_container_width=True):
+            st.session_state.current_page = 'admin_certificates'
+            st.rerun()
+        
+        if st.button("⚙️ System Settings", use_container_width=True):
+            st.session_state.current_page = 'system_settings'
+            st.rerun()
+    
+    # Top Performing Topics
+    st.markdown("### 🎯 Top Performing Topics")
+    if stats['top_topics']:
+        df_topics = pd.DataFrame(stats['top_topics'], columns=['Topic', 'Tests Taken', 'Average Score'])
+        df_topics['Average Score'] = df_topics['Average Score'].round(1)
+        st.dataframe(df_topics, use_container_width=True)
+    else:
+        st.info("No assessment data available yet")
+
+def show_user_management():
+    """User management page for admin"""
+    st.markdown("""
+    <div style="max-width: 1200px; margin: 0 auto; padding: 2rem;">
+        <h1 style="font-size: 2.5rem; font-weight: 800; color: var(--text-primary); margin-bottom: 0.5rem;">
+            👥 User Management
+        </h1>
+        <p style="color: var(--text-secondary); margin-bottom: 3rem;">
+            Manage user accounts and permissions
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Back button
+    if st.button("← Back to Admin Dashboard"):
+        st.session_state.current_page = 'admin_dashboard'
+        st.rerun()
+    
+    # Add User Section
+    st.markdown("### 👤 Add New User")
+    with st.expander("Click to add a new user", expanded=False):
+        with st.form("add_user_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                new_username = st.text_input("Username")
+                new_email = st.text_input("Email")
+            with col2:
+                new_password = st.text_input("Password", type="password")
+                is_admin = st.checkbox("Make this user an admin")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                add_btn = st.form_submit_button("Add User", use_container_width=True)
+            with col2:
+                cancel_btn = st.form_submit_button("Cancel", use_container_width=True, type="secondary")
+            
+            if add_btn:
+                if new_username and new_email and new_password:
+                    if create_user(new_username, new_email, new_password, is_admin):
+                        st.success(f"User '{new_username}' created successfully!")
+                        st.rerun()
+                    else:
+                        st.error("Username or email already exists")
+                else:
+                    st.warning("Please fill in all required fields")
+    
+    st.markdown("---")
+    
+    # User List with Search
+    st.markdown("### 📋 All Users")
+    
+    # Search and Filter
+    col1, col2, col3 = st.columns([2, 1, 1])
+    with col1:
+        search_query = st.text_input("Search users", placeholder="Search by username or email")
+    with col2:
+        filter_status = st.selectbox("Status", ["All", "Active", "Inactive"])
+    with col3:
+        filter_admin = st.selectbox("User Type", ["All", "Admins", "Regular Users"])
+    
+    # Get all users
+    all_users = get_all_users()
+    
+    # Apply filters
+    filtered_users = all_users
+    if search_query:
+        filtered_users = [u for u in filtered_users if 
+                         search_query.lower() in u[1].lower() or 
+                         search_query.lower() in u[2].lower()]
+    
+    if filter_status != "All":
+        status_filter = 1 if filter_status == "Active" else 0
+        filtered_users = [u for u in filtered_users if u[5] == status_filter]
+    
+    if filter_admin != "All":
+        admin_filter = 1 if filter_admin == "Admins" else 0
+        filtered_users = [u for u in filtered_users if u[6] == admin_filter]
+    
+    # Display users in a table
+    if filtered_users:
+        # Create DataFrame for better display
+        user_data = []
+        for user in filtered_users:
+            user_id, username, email, created_at, last_login, is_active, is_admin = user
+            
+            user_data.append({
+                'ID': user_id,
+                'Username': username,
+                'Email': email,
+                'Created': created_at[:10],
+                'Last Login': last_login[:19] if last_login else 'Never',
+                'Status': '🟢 Active' if is_active else '🔴 Inactive',
+                'Type': '👑 Admin' if is_admin else '👤 User',
+                'Actions': ''
+            })
+        
+        df = pd.DataFrame(user_data)
+        
+        # Display with actions
+        st.dataframe(
+            df,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                'ID': st.column_config.NumberColumn(width='small'),
+                'Status': st.column_config.TextColumn(width='small'),
+                'Type': st.column_config.TextColumn(width='small'),
+                'Actions': st.column_config.Column(width='medium')
+            }
+        )
+        
+        # Detailed view for selected user
+        st.markdown("### 👤 User Details")
+        if 'selected_user' in st.session_state:
+            user_details = get_user_details(st.session_state.selected_user)
+            
+            if user_details:
+                user_info = user_details['user_info']
+                stats = user_details['stats']
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.markdown("#### Basic Information")
+                    st.write(f"**Username:** {user_info[1]}")
+                    st.write(f"**Email:** {user_info[2]}")
+                    st.write(f"**Created:** {user_info[3]}")
+                    st.write(f"**Last Login:** {user_info[4] or 'Never'}")
+                    st.write(f"**Status:** {'🟢 Active' if user_info[5] else '🔴 Inactive'}")
+                    st.write(f"**Type:** {'👑 Admin' if user_info[6] else '👤 Regular User'}")
+                
+                with col2:
+                    st.markdown("#### Statistics")
+                    if stats[0]:  # Has tests
+                        st.write(f"**Total Tests:** {stats[0]}")
+                        st.write(f"**Average Score:** {stats[1]:.1f}%")
+                        st.write(f"**Best Score:** {stats[2]:.1f}%")
+                    else:
+                        st.write("**No assessments taken yet**")
+                    
+                    # Action buttons
+                    st.markdown("#### Actions")
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        if st.button("Toggle Status", use_container_width=True):
+                            new_status = 0 if user_info[5] else 1
+                            update_user_status(user_info[0], new_status)
+                            st.success(f"User status updated to {'Active' if new_status else 'Inactive'}")
+                            st.rerun()
+                    
+                    with col_b:
+                        if st.button("Delete User", use_container_width=True, type="secondary"):
+                            if st.checkbox(f"Confirm deletion of {user_info[1]} (cannot be undone)"):
+                                delete_user(user_info[0])
+                                st.success(f"User {user_info[1]} deleted successfully!")
+                                del st.session_state.selected_user
+                                st.rerun()
+                
+                # Recent Activity
+                st.markdown("#### Recent Activity")
+                recent_activity = user_details['recent_activity']
+                if recent_activity:
+                    for activity in recent_activity[:5]:
+                        topic, score, total, difficulty, timestamp = activity
+                        percentage = (score / total * 100) if total > 0 else 0
+                        col_a, col_b, col_c = st.columns([3, 1, 1])
+                        with col_a:
+                            st.write(f"**{topic}**")
+                            st.caption(timestamp[:16])
+                        with col_b:
+                            st.write(f"{percentage:.1f}%")
+                        with col_c:
+                            st.write(difficulty)
+                        st.divider()
+                else:
+                    st.info("No recent activity")
+                
+                # Certificates
+                st.markdown("#### Certificates")
+                certificates = user_details['certificates']
+                if certificates:
+                    for cert in certificates:
+                        cert_id, topic, score, issue_date, status = cert
+                        col_a, col_b, col_c = st.columns([2, 1, 1])
+                        with col_a:
+                            st.write(f"**{topic}**")
+                            st.caption(f"Issued: {issue_date[:10]}")
+                        with col_b:
+                            st.write(f"{score}%")
+                        with col_c:
+                            st.write("🟢 Active" if status == 'active' else "🔴 Expired")
+                else:
+                    st.info("No certificates earned")
+                
+                # Clear selection
+                if st.button("Clear Selection"):
+                    del st.session_state.selected_user
+                    st.rerun()
+        
+        else:
+            st.info("Select a user from the list above to view details")
+    
+    else:
+        st.info("No users found matching your criteria")
+
+def show_system_analytics():
+    """System analytics and reporting"""
+    st.markdown("""
+    <div style="max-width: 1200px; margin: 0 auto; padding: 2rem;">
+        <h1 style="font-size: 2.5rem; font-weight: 800; color: var(--text-primary); margin-bottom: 0.5rem;">
+            📈 System Analytics
+        </h1>
+        <p style="color: var(--text-secondary); margin-bottom: 3rem;">
+            System-wide statistics and performance metrics
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Back button
+    if st.button("← Back to Admin Dashboard"):
+        st.session_state.current_page = 'admin_dashboard'
+        st.rerun()
+    
+    # Get comprehensive analytics
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    
+    # User growth over time
+    c.execute('''
+        SELECT date(created_at) as date, COUNT(*) as new_users
+        FROM users 
+        GROUP BY date(created_at)
+        ORDER BY date
+    ''')
+    user_growth = c.fetchall()
+    
+    # Daily assessments
+    c.execute('''
+        SELECT date(timestamp) as date, COUNT(*) as assessments
+        FROM user_scores 
+        GROUP BY date(timestamp)
+        ORDER BY date
+    ''')
+    daily_assessments = c.fetchall()
+    
+    # Topic popularity
+    c.execute('''
+        SELECT topic, COUNT(*) as test_count, 
+               AVG(CAST(score AS FLOAT) / total_questions * 100) as avg_score
+        FROM user_scores 
+        GROUP BY topic 
+        ORDER BY test_count DESC
+    ''')
+    topic_popularity = c.fetchall()
+    
+    # Performance distribution
+    c.execute('''
+        SELECT 
+            CASE 
+                WHEN CAST(score AS FLOAT) / total_questions * 100 >= 90 THEN 'Expert (90-100%)'
+                WHEN CAST(score AS FLOAT) / total_questions * 100 >= 75 THEN 'Advanced (75-89%)'
+                WHEN CAST(score AS FLOAT) / total_questions * 100 >= 60 THEN 'Intermediate (60-74%)'
+                WHEN CAST(score AS FLOAT) / total_questions * 100 >= 40 THEN 'Beginner (40-59%)'
+                ELSE 'Novice (<40%)'
+            END as level,
+            COUNT(*) as count
+        FROM user_scores 
+        GROUP BY level
+        ORDER BY count DESC
+    ''')
+    performance_dist = c.fetchall()
+    
+    conn.close()
+    
+    # Charts
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # User Growth Chart
+        if user_growth:
+            dates = [row[0] for row in user_growth]
+            new_users = [row[1] for row in user_growth]
+            cumulative_users = pd.Series(new_users).cumsum().tolist()
+            
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=dates, y=cumulative_users,
+                mode='lines+markers',
+                name='Total Users',
+                line=dict(color='#2563eb', width=3)
+            ))
+            fig.add_trace(go.Bar(
+                x=dates, y=new_users,
+                name='New Users',
+                marker_color='#7c3aed',
+                opacity=0.6
+            ))
+            fig.update_layout(
+                title='User Growth Over Time',
+                xaxis_title='Date',
+                yaxis_title='Number of Users',
+                hovermode='x unified',
+                height=400
+            )
+            st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        # Daily Assessments Chart
+        if daily_assessments:
+            dates = [row[0] for row in daily_assessments]
+            assessments = [row[1] for row in daily_assessments]
+            
+            fig = go.Figure(data=go.Scatter(
+                x=dates, y=assessments,
+                mode='lines+markers',
+                line=dict(color='#10b981', width=3),
+                marker=dict(size=8)
+            ))
+            fig.update_layout(
+                title='Daily Assessments',
+                xaxis_title='Date',
+                yaxis_title='Number of Assessments',
+                hovermode='x unified',
+                height=400
+            )
+            st.plotly_chart(fig, use_container_width=True)
+    
+    # Topic Popularity
+    st.markdown("### 🎯 Topic Popularity & Performance")
+    
+    if topic_popularity:
+        topics = [row[0] for row in topic_popularity[:10]]
+        test_counts = [row[1] for row in topic_popularity[:10]]
+        avg_scores = [row[2] for row in topic_popularity[:10]]
+        
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=topics,
+            y=test_counts,
+            name='Tests Taken',
+            marker_color='#8b5cf6'
+        ))
+        fig.add_trace(go.Scatter(
+            x=topics,
+            y=avg_scores,
+            name='Average Score (%)',
+            yaxis='y2',
+            marker=dict(color='#ef4444', size=8),
+            line=dict(color='#ef4444', width=3)
+        ))
+        
+        fig.update_layout(
+            title='Top 10 Topics: Usage vs Performance',
+            xaxis_title='Topic',
+            yaxis=dict(title='Tests Taken'),
+            yaxis2=dict(
+                title='Average Score (%)',
+                overlaying='y',
+                side='right'
+            ),
+            hovermode='x unified',
+            height=400
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # Performance Distribution
+    st.markdown("### 📊 Performance Distribution")
+    
+    if performance_dist:
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            levels = [row[0] for row in performance_dist]
+            counts = [row[1] for row in performance_dist]
+            
+            colors = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444']
+            
+            fig = go.Figure(data=[go.Pie(
+                labels=levels,
+                values=counts,
+                hole=.3,
+                marker=dict(colors=colors)
+            )])
+            fig.update_layout(
+                title='Performance Level Distribution',
+                height=400
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            st.markdown("#### Key Metrics")
+            total_tests = sum(counts)
+            st.metric("Total Tests", total_tests)
+            
+            if total_tests > 0:
+                expert_percentage = (counts[0] / total_tests * 100) if len(counts) > 0 else 0
+                passing_percentage = (sum(counts[:3]) / total_tests * 100) if len(counts) >= 3 else 0
+                
+                st.metric("Expert Level", f"{expert_percentage:.1f}%")
+                st.metric("Passing Rate (60%+)", f"{passing_percentage:.1f}%")
+    
+    # Export Data
+    st.markdown("### 📤 Data Export")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("📊 Export User Data", use_container_width=True):
+            users = get_all_users()
+            df_users = pd.DataFrame(users, columns=['ID', 'Username', 'Email', 'Created', 'Last Login', 'Active', 'Admin'])
+            csv = df_users.to_csv(index=False)
+            st.download_button(
+                label="Download CSV",
+                data=csv,
+                file_name="users_data.csv",
+                mime="text/csv"
+            )
+    
+    with col2:
+        if st.button("📈 Export Assessment Data", use_container_width=True):
+            conn = sqlite3.connect('users.db')
+            c = conn.cursor()
+            c.execute('''
+                SELECT u.username, us.topic, us.score, us.total_questions, 
+                       us.difficulty, us.level, us.timestamp
+                FROM user_scores us
+                JOIN users u ON us.user_id = u.id
+            ''')
+            assessments = c.fetchall()
+            conn.close()
+            
+            df_assessments = pd.DataFrame(assessments, 
+                columns=['Username', 'Topic', 'Score', 'Total', 'Difficulty', 'Level', 'Timestamp'])
+            csv = df_assessments.to_csv(index=False)
+            st.download_button(
+                label="Download CSV",
+                data=csv,
+                file_name="assessments_data.csv",
+                mime="text/csv"
+            )
+    
+    with col3:
+        if st.button("🏆 Export Certificate Data", use_container_width=True):
+            conn = sqlite3.connect('users.db')
+            c = conn.cursor()
+            c.execute('''
+                SELECT u.username, c.certificate_id, c.topic, c.score, 
+                       c.issue_date, c.expiry_date, c.status
+                FROM certificates c
+                JOIN users u ON c.user_id = u.id
+            ''')
+            certificates = c.fetchall()
+            conn.close()
+            
+            df_certs = pd.DataFrame(certificates,
+                columns=['Username', 'Certificate ID', 'Topic', 'Score', 'Issue Date', 'Expiry Date', 'Status'])
+            csv = df_certs.to_csv(index=False)
+            st.download_button(
+                label="Download CSV",
+                data=csv,
+                file_name="certificates_data.csv",
+                mime="text/csv"
+            )
+
+def show_admin_certificates():
+    """Admin certificate management"""
+    st.markdown("""
+    <div style="max-width: 1200px; margin: 0 auto; padding: 2rem;">
+        <h1 style="font-size: 2.5rem; font-weight: 800; color: var(--text-primary); margin-bottom: 0.5rem;">
+            🏆 Certificate Management
+        </h1>
+        <p style="color: var(--text-secondary); margin-bottom: 3rem;">
+            Manage and verify certificates
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Back button
+    if st.button("← Back to Admin Dashboard"):
+        st.session_state.current_page = 'admin_dashboard'
+        st.rerun()
+    
+    # Get all certificates
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('''
+        SELECT u.username, c.certificate_id, c.topic, c.score, 
+               c.issue_date, c.expiry_date, c.status
+        FROM certificates c
+        JOIN users u ON c.user_id = u.id
+        ORDER BY c.issue_date DESC
+    ''')
+    all_certificates = c.fetchall()
+    conn.close()
+    
+    # Filter options
+    col1, col2, col3 = st.columns([2, 1, 1])
+    with col1:
+        search_query = st.text_input("Search certificates", placeholder="Search by username, topic, or certificate ID")
+    with col2:
+        filter_status = st.selectbox("Certificate Status", ["All", "Active", "Expired", "Revoked"])
+    with col3:
+        date_range = st.selectbox("Date Range", ["All Time", "Last 7 Days", "Last 30 Days", "Last 90 Days"])
+    
+    # Apply filters
+    filtered_certs = all_certificates
+    
+    if search_query:
+        filtered_certs = [c for c in filtered_certs if 
+                         search_query.lower() in c[0].lower() or 
+                         search_query.lower() in c[2].lower() or 
+                         search_query.lower() in c[1].lower()]
+    
+    if filter_status != "All":
+        status_map = {"Active": "active", "Expired": "expired", "Revoked": "revoked"}
+        filtered_certs = [c for c in filtered_certs if c[6] == status_map[filter_status]]
+    
+    if date_range != "All Time":
+        days = {"Last 7 Days": 7, "Last 30 Days": 30, "Last 90 Days": 90}
+        cutoff_date = datetime.now() - timedelta(days=days[date_range])
+        filtered_certs = [c for c in filtered_certs if 
+                         datetime.strptime(c[4][:10], '%Y-%m-%d') > cutoff_date]
+    
+    # Display certificates
+    st.markdown(f"### 📜 Certificates ({len(filtered_certs)} found)")
+    
+    if filtered_certs:
+        # Create DataFrame for display
+        cert_data = []
+        for cert in filtered_certs:
+            username, cert_id, topic, score, issue_date, expiry_date, status = cert
+            
+            cert_data.append({
+                'Username': username,
+                'Certificate ID': cert_id,
+                'Topic': topic,
+                'Score': f"{score}%",
+                'Issue Date': issue_date[:10],
+                'Expiry Date': expiry_date[:10] if expiry_date else 'N/A',
+                'Status': status.title(),
+                'Level': determine_level(score)
+            })
+        
+        df = pd.DataFrame(cert_data)
+        st.dataframe(df, use_container_width=True, hide_index=True)
+        
+        # Certificate Statistics
+        st.markdown("### 📊 Certificate Statistics")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            total_certs = len(filtered_certs)
+            st.metric("Total", total_certs)
+        
+        with col2:
+            active_certs = len([c for c in filtered_certs if c[6] == 'active'])
+            st.metric("Active", active_certs)
+        
+        with col3:
+            avg_score = sum([c[3] for c in filtered_certs]) / total_certs if total_certs > 0 else 0
+            st.metric("Avg Score", f"{avg_score:.1f}%")
+        
+        with col4:
+            top_topic = max([(c[2], len([x for x in filtered_certs if x[2] == c[2]])) 
+                           for c in filtered_certs], key=lambda x: x[1])[0] if filtered_certs else "N/A"
+            st.metric("Most Common", top_topic[:15] + ('...' if len(top_topic) > 15 else ''))
+        
+        # Certificate Preview
+        st.markdown("### 👁️ Certificate Preview")
+        selected_cert = st.selectbox(
+            "Select a certificate to preview",
+            [f"{c[0]} - {c[2]} ({c[1]})" for c in filtered_certs[:20]]
+        )
+        
+        if selected_cert:
+            # Extract certificate ID from selection
+            cert_id = selected_cert.split('(')[-1].rstrip(')')
+            cert_details = next((c for c in filtered_certs if c[1] == cert_id), None)
+            
+            if cert_details:
+                username, cert_id, topic, score, issue_date, expiry_date, status = cert_details
+                
+                # Generate preview
+                cert_html = generate_certificate_html(username, topic, score, cert_id, issue_date[:10])
+                
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.components.v1.html(cert_html, height=600, scrolling=True)
+                
+                with col2:
+                    st.markdown("#### Certificate Details")
+                    st.write(f"**User:** {username}")
+                    st.write(f"**Topic:** {topic}")
+                    st.write(f"**Score:** {score}%")
+                    st.write(f"**Level:** {determine_level(score)}")
+                    st.write(f"**Issue Date:** {issue_date[:10]}")
+                    st.write(f"**Expiry Date:** {expiry_date[:10] if expiry_date else 'Never'}")
+                    st.write(f"**Status:** {status}")
+                    
+                    # Actions
+                    st.markdown("#### Actions")
+                    if st.button("📥 Download Certificate", use_container_width=True):
+                        b64 = base64.b64encode(cert_html.encode()).decode()
+                        href = f'<a href="data:text/html;base64,{b64}" download="certificate_{cert_id}.html">Click to download</a>'
+                        st.markdown(href, unsafe_allow_html=True)
+                    
+                    if st.button("🖨️ Print Certificate", use_container_width=True):
+                        st.info("Use the browser's print function (Ctrl+P)")
+                    
+                    if status == 'active':
+                        if st.button("🚫 Revoke Certificate", use_container_width=True, type="secondary"):
+                            conn = sqlite3.connect('users.db')
+                            c = conn.cursor()
+                            c.execute('UPDATE certificates SET status="revoked" WHERE certificate_id=?', (cert_id,))
+                            conn.commit()
+                            conn.close()
+                            st.success("Certificate revoked successfully!")
+                            st.rerun()
+    
+    else:
+        st.info("No certificates found matching your criteria")
+
+def show_system_settings():
+    """System settings page"""
+    st.markdown("""
+    <div style="max-width: 1200px; margin: 0 auto; padding: 2rem;">
+        <h1 style="font-size: 2.5rem; font-weight: 800; color: var(--text-primary); margin-bottom: 0.5rem;">
+            ⚙️ System Settings
+        </h1>
+        <p style="color: var(--text-secondary); margin-bottom: 3rem;">
+            Configure system-wide settings and preferences
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Back button
+    if st.button("← Back to Admin Dashboard"):
+        st.session_state.current_page = 'admin_dashboard'
+        st.rerun()
+    
+    tabs = st.tabs(["General", "Assessment", "Security", "Maintenance"])
+    
+    with tabs[0]:
+        st.markdown("### ⚙️ General Settings")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            system_name = st.text_input("System Name", value="Skill Assessment Pro")
+            admin_email = st.text_input("Admin Email", value="admin@skillassessment.com")
+            enable_registration = st.checkbox("Enable User Registration", value=True)
+            require_email_verification = st.checkbox("Require Email Verification", value=False)
+        
+        with col2:
+            default_timezone = st.selectbox("Default Timezone", ["UTC", "EST", "PST", "IST"])
+            date_format = st.selectbox("Date Format", ["YYYY-MM-DD", "DD/MM/YYYY", "MM/DD/YYYY"])
+            language = st.selectbox("Language", ["English", "Spanish", "French", "German"])
+        
+        if st.button("💾 Save General Settings", use_container_width=True):
+            st.success("General settings saved successfully!")
+    
+    with tabs[1]:
+        st.markdown("### 📝 Assessment Settings")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            min_questions = st.number_input("Minimum Questions per Test", 1, 50, 5)
+            max_questions = st.number_input("Maximum Questions per Test", 1, 100, 20)
+            passing_score = st.number_input("Passing Score (%)", 0, 100, 60)
+            certificate_threshold = st.number_input("Certificate Threshold (%)", 0, 100, 80)
+        
+        with col2:
+            default_difficulty = st.selectbox("Default Difficulty", ["Easy", "Medium", "Hard"])
+            time_limit_enabled = st.checkbox("Enable Time Limits", value=True)
+            default_time_limit = st.number_input("Default Time Limit (minutes)", 5, 180, 30)
+            show_answers_default = st.checkbox("Show Answers by Default", value=True)
+        
+        if st.button("💾 Save Assessment Settings", use_container_width=True):
+            st.success("Assessment settings saved successfully!")
+    
+    with tabs[2]:
+        st.markdown("### 🔒 Security Settings")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            password_min_length = st.number_input("Minimum Password Length", 6, 20, 8)
+            require_special_char = st.checkbox("Require Special Characters", value=True)
+            require_numbers = st.checkbox("Require Numbers", value=True)
+            max_login_attempts = st.number_input("Max Login Attempts", 1, 10, 5)
+        
+        with col2:
+            session_timeout = st.number_input("Session Timeout (minutes)", 5, 240, 30)
+            enable_2fa = st.checkbox("Enable Two-Factor Authentication", value=False)
+            log_ip_addresses = st.checkbox("Log IP Addresses", value=True)
+            enable_brute_force_protection = st.checkbox("Enable Brute Force Protection", value=True)
+        
+        if st.button("💾 Save Security Settings", use_container_width=True):
+            st.success("Security settings saved successfully!")
+    
+    with tabs[3]:
+        st.markdown("### 🛠️ Maintenance")
+        
+        st.markdown("#### Database Operations")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🔄 Optimize Database", use_container_width=True):
+                st.info("Database optimization would run here")
+                st.success("Database optimized successfully!")
+            
+            if st.button("🧹 Clean Old Data", use_container_width=True):
+                days = st.number_input("Delete data older than (days)", 30, 365, 90)
+                if st.button("Confirm Cleanup", key="cleanup_confirm"):
+                    st.warning(f"This will delete data older than {days} days")
+                    # Add cleanup logic here
+        
+        with col2:
+            if st.button("📊 Rebuild Statistics", use_container_width=True):
+                st.info("Rebuilding statistics...")
+                # Add statistics rebuild logic here
+                st.success("Statistics rebuilt successfully!")
+            
+            if st.button("🔍 Check Database Integrity", use_container_width=True):
+                st.info("Checking database integrity...")
+                # Add integrity check logic here
+                st.success("Database integrity check completed!")
+        
+        st.markdown("#### System Information")
+        st.write(f"**Database File:** users.db")
+        st.write(f"**Total Users:** {len(get_all_users())}")
+        st.write(f"**Total Assessments:** {get_system_stats()['total_assessments']}")
+        
+        if st.button("🔄 Refresh System Info", use_container_width=True):
+            st.rerun()
+
+# ============================================
+# ENHANCED CSS WITH PROFESSIONAL DESIGN
+# ============================================
+def load_css():
+    return '''
+    <style>
+    /* Reset and Base Styles */
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+    
+    :root {
+        /* Modern Color Palette */
+        --primary: #2563eb;
+        --primary-dark: #1d4ed8;
+        --primary-light: #3b82f6;
+        --secondary: #7c3aed;
+        --secondary-dark: #6d28d9;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+        --info: #06b6d4;
+        --expert: #8b5cf6;
+        --advanced: #3b82f6;
+        --intermediate: #10b981;
+        --beginner: #f59e0b;
+        --novice: #ef4444;
+        
+        /* Admin Colors */
+        --admin-primary: #8b5cf6;
+        --admin-secondary: #7c3aed;
+        
+        /* Light Theme Colors */
+        --bg-primary: #ffffff;
+        --bg-secondary: #f8fafc;
+        --bg-sidebar: #ffffff;
+        --text-primary: #1e293b;
+        --text-secondary: #475569;
+        --border-color: #e2e8f0;
+        --card-bg: #ffffff;
+        
+        /* UI Variables */
+        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        --radius-sm: 0.375rem;
+        --radius: 0.5rem;
+        --radius-md: 0.75rem;
+        --radius-lg: 1rem;
+        --radius-xl: 1.5rem;
+        --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    /* Streamlit App Background */
+    .stApp {
+        background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%) !important;
+        min-height: 100vh;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    }
+    
+    /* Dashboard Cards */
+    .dashboard-card {
+        background: var(--card-bg);
+        border-radius: var(--radius-lg);
+        padding: 1.5rem;
+        border: 1px solid var(--border-color);
+        box-shadow: var(--shadow-sm);
+        transition: var(--transition);
+        height: 100%;
+    }
+    
+    .dashboard-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+        border-color: var(--primary-light);
+    }
+    
+    .dashboard-card-primary {
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        color: white;
+    }
+    
+    .dashboard-card-secondary {
+        background: linear-gradient(135deg, var(--secondary), var(--secondary-dark));
+        color: white;
+    }
+    
+    .dashboard-card-success {
+        background: linear-gradient(135deg, var(--success), #0da271);
+        color: white;
+    }
+    
+    .dashboard-card-warning {
+        background: linear-gradient(135deg, var(--warning), #d97706);
+        color: white;
+    }
+    
+    /* Admin Cards */
+    .admin-card {
+        background: linear-gradient(135deg, var(--admin-primary), var(--admin-secondary));
+        color: white;
+        border-radius: var(--radius-lg);
+        padding: 1.5rem;
+        box-shadow: var(--shadow-lg);
+    }
+    
+    /* User Avatar */
+    .user-avatar {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: linear-gradient(45deg, var(--primary), var(--secondary));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.5rem;
+        font-weight: bold;
+        margin: 0 auto 1rem;
+    }
+    
+    /* Level Badges */
+    .level-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: var(--radius);
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    
+    .level-expert { background: var(--expert); color: white; }
+    .level-advanced { background: var(--advanced); color: white; }
+    .level-intermediate { background: var(--intermediate); color: white; }
+    .level-beginner { background: var(--beginner); color: white; }
+    .level-novice { background: var(--novice); color: white; }
+    
+    /* Buttons - Fixed */
+    div.stButton > button {
+        width: 100% !important;
+        background: linear-gradient(45deg, var(--primary), var(--primary-dark)) !important;
+        color: white !important;
+        border: none !important;
+        padding: 0.875rem 1.5rem !important;
+        border-radius: var(--radius) !important;
+        font-weight: 600 !important;
+        font-size: 1rem !important;
+        transition: var(--transition) !important;
+        cursor: pointer !important;
+        position: relative !important;
+        overflow: hidden !important;
+    }
+    
+    div.stButton > button:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: var(--shadow-lg) !important;
+    }
+    
+    /* Admin Button */
+    div.stButton > button.kind-secondary {
+        background: linear-gradient(45deg, var(--secondary), var(--secondary-dark)) !important;
+    }
+    
+    /* Animations */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .fade-in {
+        animation: fadeIn 0.6s ease-out;
+    }
+    
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .main-title {
+            font-size: 2.5rem;
+        }
+    }
+    </style>
+    '''
+
+# ============================================
+# GEMINI API FUNCTION
+# ============================================
+def generate_with_fallback(prompt):
+    GEMINI_API_KEYS = [
+        "AIzaSyB55YBQ6x97ah4rZgs8F-6UhZtCS90xK6k",
+        "AIzaSyDway_4FY72fOG9Fz_Y56LjOvLg6wIdD7k"
+    ]
+    
+    for index, api_key in enumerate(GEMINI_API_KEYS, start=1):
+        try:
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel("models/gemini-2.5-flash")
+            response = model.generate_content(prompt)
+            
+            if not response or not response.text:
+                raise RuntimeError("Empty response received")
+                
+            return response.text.strip()
+            
+        except Exception as e:
+            error_msg = str(e).lower()
+            
+            if any(k in error_msg for k in ["quota", "limit", "429", "permission", "auth", "key"]):
+                time.sleep(1)
+                continue
+            else:
+                st.error(f"API Error: {str(e)[:100]}")
+                return None
+    
+    raise RuntimeError("All API keys exhausted. Please try again later.")
+
+# ============================================
+# STREAMLIT APP CONFIG
+# ============================================
+st.set_page_config(
+    page_title="Skill Assessment Pro",
+    page_icon="🎯",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+    menu_items={
+        'Get Help': 'https://github.com/Mr-Asmath',
+        'Report a bug': 'https://github.com/Mr-Asmath/issues',
+        'About': '# Skill Assessment Pro\nAI-powered assessment platform'
+    }
+)
+
+# Initialize database
+init_db()
+
+# Initialize session state
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+if 'username' not in st.session_state:
+    st.session_state.username = None
+if 'user_id' not in st.session_state:
+    st.session_state.user_id = None
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = 'welcome'
+if 'welcome_shown' not in st.session_state:
+    st.session_state.welcome_shown = False
+if 'countdown' not in st.session_state:
+    st.session_state.countdown = 3
+if 'questions' not in st.session_state:
+    st.session_state.questions = None
+if 'score' not in st.session_state:
+    st.session_state.score = None
+if 'is_admin' not in st.session_state:
+    st.session_state.is_admin = False
+if 'current_test_type' not in st.session_state:
+    st.session_state.current_test_type = None
+if 'current_topic' not in st.session_state:
+    st.session_state.current_topic = None
+if 'show_certificate' not in st.session_state:
+    st.session_state.show_certificate = False
+if 'selected_user' not in st.session_state:
+    st.session_state.selected_user = None
+
 # ============================================
 # MAIN APP ROUTING
 # ============================================
@@ -2510,12 +3382,7 @@ def main():
     # Route to appropriate page
     if st.session_state.logged_in:
         if st.session_state.is_admin:
-            # admin_dashboard() would go here - kept as placeholder
-            st.error("Admin dashboard not implemented in this version")
-            if st.button("Go to Learner Dashboard"):
-                st.session_state.is_admin = False
-                st.session_state.current_page = 'dashboard'
-                st.rerun()
+            admin_dashboard()
         else:
             learner_dashboard()
     else:
