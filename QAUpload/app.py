@@ -476,7 +476,7 @@ def learner_dashboard():
                 {st.session_state.username[0].upper() if st.session_state.username else 'U'}
             </div>
             <h3 style="color: var(--text-primary);">{st.session_state.username}</h3>
-            <p style="color: var(--text-secondary); font-size: 0.875rem;">Skill Assessment Platform</p>
+            <p style="color: var(--text-secondary); font-size: 0.875rem;">SmartTrack-AI Platform</p>
         </div>
         """, unsafe_allow_html=True)
         
@@ -535,7 +535,7 @@ def show_dashboard_home():
     st.markdown("""
     <div style="max-width: 1200px; margin: 0 auto; padding: 2rem;">
         <h1 style="font-size: 2.5rem; font-weight: 800; color: var(--text-primary); margin-bottom: 0.5rem;">
-            🎯 Welcome to Skill Assessment Pro
+            🎯 Welcome to SmartTrack-AI
         </h1>
         <p style="color: var(--text-secondary); margin-bottom: 3rem;">
             Your personal learning and assessment dashboard
@@ -3141,7 +3141,7 @@ def load_css():
         /* Light Theme Colors */
         --bg-primary: #ffffff;
         --bg-secondary: #f8fafc;
-        --bg-sidebar: blue;
+        --bg-sidebar: #ffffff;
         --text-primary: #1e293b;
         --text-secondary: #475569;
         --border-color: #e2e8f0;
@@ -3399,6 +3399,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
