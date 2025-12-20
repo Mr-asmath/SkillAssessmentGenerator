@@ -3245,6 +3245,10 @@ def load_css():
     .level-beginner { background: var(--beginner); color: white; }
     .level-novice { background: var(--novice); color: white; }
     
+    div.stButto{
+     background-color:blue;
+    }
+    
     /* Buttons - Fixed */
     div.stButton > button {
         width: 100% !important;
@@ -3399,6 +3403,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
