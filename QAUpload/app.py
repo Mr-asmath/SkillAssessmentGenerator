@@ -3245,7 +3245,7 @@ def load_css():
     .level-beginner { background: var(--beginner); color: white; }
     .level-novice { background: var(--novice); color: white; }
     
-    div.stButto{
+    div.stButton{
      background-color:transparent;
     }
     
@@ -3403,6 +3403,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
