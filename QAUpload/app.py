@@ -3246,7 +3246,7 @@ def load_css():
     .level-novice { background: var(--novice); color: white; }
     
     div.stButto{
-     background-color:blue;
+     background-color:transparent;
     }
     
     /* Buttons - Fixed */
@@ -3403,6 +3403,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
