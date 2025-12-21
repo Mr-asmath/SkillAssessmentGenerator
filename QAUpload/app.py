@@ -3300,7 +3300,7 @@ def load_css():
 def generate_with_fallback(prompt):
     GEMINI_API_KEYS = [
         "AIzaSyB7GckkWFujMxK7XSDpQ156m0imoIeGmZ4",
-        "AIzaSyDXyWrjc3zLqLkNstTRiwOB2uWePf9XpGI"
+        "AIzaSyAgqBSEGCkV3-CkCsMuN5kLW0yuCJDAQpo"
     ]
     
     for index, api_key in enumerate(GEMINI_API_KEYS, start=1):
