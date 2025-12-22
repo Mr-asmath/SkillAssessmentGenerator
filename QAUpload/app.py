@@ -3589,7 +3589,7 @@ def load_css():
 # ============================================
 def generate_with_fallback(prompt):
     GEMINI_API_KEYS = [
-        "AIzaSyDOTVWTAWF2VX_MFBs8sgUS0eSUFaz_eXw",
+        "AIzaSyCcJ4gWqENZ-AONM8G6PNdVu89Xy2hENtk",
         
     ]
     
@@ -3693,6 +3693,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
