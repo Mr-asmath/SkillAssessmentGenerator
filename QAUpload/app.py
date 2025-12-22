@@ -53,61 +53,6 @@ def init_db():
             certificate_id TEXT UNIQUE,
             topic TEXT,
             score INTEGER,
-            iimport streamlit as st
-import google.generativeai as genai
-import time
-import sqlite3
-import hashlib
-import pandas as pd
-from datetime import datetime, timedelta
-import plotly.express as px
-import plotly.graph_objects as go
-import secrets
-import string
-import random
-from io import BytesIO
-import base64
-
-# ============================================
-# DATABASE SETUP & ADMIN FUNCTIONS
-# ============================================
-def init_db():
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            last_login TIMESTAMP,
-            is_active INTEGER DEFAULT 1,
-            is_admin INTEGER DEFAULT 0
-        )
-    ''')
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS user_scores (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            topic TEXT,
-            score INTEGER,
-            total_questions INTEGER,
-            difficulty TEXT,
-            level TEXT,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (id)
-        )
-    ''')
-    
-    # Create certificates table
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS certificates (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            certificate_id TEXT UNIQUE,
-            topic TEXT,
-            score INTEGER,
             issue_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             expiry_date TIMESTAMP,
             status TEXT DEFAULT 'active',
@@ -385,7 +330,7 @@ def welcome_page():
         with open(path, "rb") as img:
             return base64.b64encode(img.read()).decode()
 
-    
+    img_base64 = get_base64_image("logo.png")
     st.markdown(f"""
         <style>
         /* Page background */
@@ -497,7 +442,7 @@ def welcome_page():
         <div class="welcome-container"'>
             <div class="logo-title" style='filter: blur(0.2px);'>
                 <div class="logo-icon">
-                    <img src="logo.png" width="100">
+                    <img src="" width="100">
                 </div>
                 <h1 class="main-title">Skill Assessment Generator</h1>
                 <p class="tagline">
@@ -880,7 +825,7 @@ def show_dashboard_home():
     st.markdown("""
     <div style="max-width: 1200px; margin: 0 auto; padding: 2rem;">
         <h1 style="font-size: 2.5rem; font-weight: 800; color: var(--text-primary); margin-bottom: 0.5rem;">
-            🎯 Welcome to Skill Assessment Generator 
+            🎯 Welcome to Skill Assessment Generator
         </h1>
         <p style="color: var(--text-secondary); margin-bottom: 3rem;">
             Your personal learning and assessment dashboard
@@ -3493,6 +3438,7 @@ def load_css():
         --card-bg: #ffffff;
         
         /* UI Variables */
+        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
         --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
         --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
@@ -3643,7 +3589,7 @@ def load_css():
 # ============================================
 def generate_with_fallback(prompt):
     GEMINI_API_KEYS = [
-        "AIzaSyBgTiUTHygHEyu92d9tVepxVEYaIGbgpI8",
+        "AIzaSyDOTVWTAWF2VX_MFBs8sgUS0eSUFaz_eXw",
         
     ]
     
