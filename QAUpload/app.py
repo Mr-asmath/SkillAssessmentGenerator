@@ -330,7 +330,7 @@ def welcome_page():
         with open(path, "rb") as img:
             return base64.b64encode(img.read()).decode()
 
-    img_base64 = get_base64_image("logo.png")
+    
     st.markdown(f"""
         <style>
         /* Page background */
@@ -3693,6 +3693,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
