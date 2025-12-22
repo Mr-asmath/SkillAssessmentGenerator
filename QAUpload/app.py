@@ -880,8 +880,7 @@ def show_dashboard_home():
     st.markdown("""
     <div style="max-width: 1200px; margin: 0 auto; padding: 2rem;">
         <h1 style="font-size: 2.5rem; font-weight: 800; color: var(--text-primary); margin-bottom: 0.5rem;">
-            🎯 Welcome to Skill Assessment Generator
-        </h1>
+            🎯 Welcome to Skill Assessment Generator</h1>
         <p style="color: var(--text-secondary); margin-bottom: 3rem;">
             Your personal learning and assessment dashboard
         </p>
