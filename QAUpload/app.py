@@ -330,7 +330,7 @@ def welcome_page():
         with open(path, "rb") as img:
             return base64.b64encode(img.read()).decode()
 
-    img_base64 = get_base64_image("logo.png")
+    
     st.markdown(f"""
         <style>
         /* Page background */
@@ -442,7 +442,7 @@ def welcome_page():
         <div class="welcome-container"'>
             <div class="logo-title" style='filter: blur(0.2px);'>
                 <div class="logo-icon">
-                    <img src="data:image/png;base64,{img_base64}" width="100">
+                    <img src="logo.png" width="100">
                 </div>
                 <h1 class="main-title">Skill Assessment Generator</h1>
                 <p class="tagline">
@@ -3693,3 +3693,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
