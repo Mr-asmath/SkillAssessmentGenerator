@@ -326,6 +326,135 @@ def get_all_users():
 
 def welcome_page():
     st.markdown(load_css(), unsafe_allow_html=True)
+    def get_base64_image(path):
+        with open(path, "rb") as img:
+            return base64.b64encode(img.read()).decode()
+
+    img_base64 = get_base64_image("logo.png")
+    st.markdown(f"""
+        <style>
+        /* Page background */
+        body {{
+            background-color: none;
+        }}
+
+        /* Main container */
+        .welcome-container {{
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            text-align: center;
+            font-family: 'Segoe UI', sans-serif;
+        }}
+
+        /* Card box */
+        .logo-title {{
+            background: rgba(255, 255, 255, 0.08);
+            padding: 40px 50px;
+            border-radius: 18px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            backdrop-filter: blur(12px);
+            animation: fadeIn 1.2s ease-in-out;
+        }}
+
+        /* Logo icon */
+        .logo-icon {{
+            font-size: 64px;
+            margin-bottom: 10px;
+        }}
+
+        /* Title */
+        .main-title {{
+            font-size: 42px;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 12px;
+        }}
+
+        /* Tagline */
+        .tagline {{
+            font-size: 16px;
+            color: black;
+            line-height: 1.6;
+            margin-bottom: 25px;
+        }}
+
+        /* Countdown text */
+        .countdown {{
+            font-size: 14px;
+            color: black;
+            margin-bottom: 22px;
+            opacity: 0.85;
+        }}
+        .logo-icon {{
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 15px;
+        }}
+        .logo-icon img {{
+            width: 90px;          
+            height: auto;
+            max-width: 100%;
+            object-fit: contain;
+            border-radius: 12px;  
+        }}
+        .logo-icon img {{
+            filter: drop-shadow(0 4px 12px rgba(255, 255, 255, 0.25));
+        }}
+
+        /* Button */
+        .action-btn {{
+            display: inline-block;
+            padding: 14px 34px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #ffffff;
+            background: linear-gradient(135deg, #ff512f, #f09819);
+            border-radius: 30px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }}
+
+        .action-btn:hover {{
+            transform: scale(1.05);
+            box-shadow: 0 8px 20px rgba(240,152,25,0.4);
+        }}
+
+        /* Animation */
+        @keyframes fadeIn {{
+            from {{
+                opacity: 0;
+                transform: translateY(20px);
+            }}
+            to {{
+                opacity: 1;
+                transform: translateY(0);
+            }}
+        }}
+        
+
+        </style>
+
+        <div class="welcome-container"'>
+            <div class="logo-title" style='filter: blur(0.2px);'>
+                <div class="logo-icon">
+                    <img src="data:image/png;base64,{img_base64}" width="100">
+                </div>
+                <h1 class="main-title">Skill Assessment Generator</h1>
+                <p class="tagline">
+                    Transform your learning journey with AI-powered assessments. 
+                    Generate personalized tests, track your progress, and master any topic.
+                </p>
+                <div class="countdown">
+                    Redirecting to login in {st.session_state.countdown} seconds...
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
     
     # Auto-redirect after 3 seconds
     if not st.session_state.welcome_shown:
@@ -342,25 +471,6 @@ def welcome_page():
     if st.session_state.countdown == 0:
         st.session_state.current_page = 'login'
         st.rerun()
-    
-    st.markdown(f"""
-    <div class="welcome-container">
-        <div class="logo-title">
-            <div class="logo-icon">🎯</div>
-            <h1 class="main-title">Skill Assessment Pro</h1>
-            <p class="tagline">
-                Transform your learning journey with AI-powered assessments. 
-                Generate personalized tests, track your progress, and master any topic.
-            </p>
-            <div class="countdown">
-                Redirecting to login in {st.session_state.countdown} seconds...
-            </div>
-            <a href="?page=login" class="action-btn">
-                🚀 Get Started Now
-            </a>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
 
 def login_page():
     st.markdown(load_css(), unsafe_allow_html=True)
@@ -466,7 +576,186 @@ def register_page():
 
 def learner_dashboard():
     """Main dashboard for learners after login"""
-    st.markdown(load_css(), unsafe_allow_html=True)
+    st.markdown(f"""
+    <style>
+    /* Sidebar styling */
+    [data-testid="stSidebar"] {{
+        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%) !important;
+        border-right: 1px solid #e2e8f0 !important;
+    }}
+    
+    /* Sidebar user profile */
+    .user-profile {{
+        text-align: center !important;
+        padding: 1.5rem 1rem !important;
+        margin-bottom: 1rem !important;
+    }}
+    
+    .user-avatar {{
+        width: 70px !important;
+        height: 70px !important;
+        border-radius: 50% !important;
+        background: linear-gradient(135deg, #3b82f6, #8b5cf6) !important;
+        color: white !important;
+        font-size: 2rem !important;
+        font-weight: 600 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        margin: 0 auto 1rem auto !important;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2) !important;
+    }}
+    
+    /* Sidebar headings */
+    [data-testid="stSidebar"] h2 {{
+        color: #334155 !important;
+        font-size: 1.1rem !important;
+        font-weight: 600 !important;
+        margin: 1.5rem 0 1rem 0 !important;
+        padding: 0 1rem !important;
+        letter-spacing: 0.5px !important;
+    }}
+    
+    /* Sidebar divider */
+    [data-testid="stSidebar"] hr {{
+        margin: 1.5rem 0 !important;
+        border-color: #e2e8f0 !important;
+        opacity: 0.7 !important;
+    }}
+    
+    /* MENU BUTTONS - Clean, minimal style */
+    [data-testid="stSidebar"] .stButton > button {{
+        all: unset !important;
+        width: 100% !important;
+        text-align: left !important;
+        padding: 0.85rem 1rem !important;
+        margin: 0.15rem 0 !important;
+        border-radius: 8px !important;
+        background: transparent !important;
+        color: #475569 !important;
+        font-size: 0.95rem !important;
+        font-weight: 500 !important;
+        transition: all 0.2s ease !important;
+        cursor: pointer !important;
+        display: flex !important;
+        align-items: center !important;
+        border: none !important;
+        box-shadow: none !important;
+        border-left: 3px solid transparent !important;
+    }}
+    
+    /* Menu button hover effect */
+    [data-testid="stSidebar"] .stButton > button:hover {{
+        background: #f1f5f9 !important;
+        color: #1e293b !important;
+        border-left: 3px solid #3b82f6 !important;
+        transform: translateX(2px) !important;
+    }}
+    
+    /* Menu button active state */
+    [data-testid="stSidebar"] .stButton > button:active {{
+        background: #e2e8f0 !important;
+        transform: translateX(0) !important;
+    }}
+    
+    /* Menu button focus state */
+    [data-testid="stSidebar"] .stButton > button:focus {{
+        outline: none !important;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1) !important;
+    }}
+    
+    /* Icon spacing in buttons */
+    [data-testid="stSidebar"] .stButton > button::before {{
+        content: "" !important;
+        display: inline-block !important;
+        width: 24px !important;
+        margin-right: 10px !important;
+        text-align: center !important;
+        opacity: 0.8 !important;
+    }}
+    
+    /* Optional: Add actual icons (if you have icon fonts) */
+    /* If using emojis like you have, they'll display normally */
+    
+    /* Logout button specific styling */
+    [data-testid="stSidebar"] .stButton > button:contains("🚪") {{
+        margin-top: 2rem !important;
+        background: #f1f5f9 !important;
+        color: #dc2626 !important;
+        font-weight: 600 !important;
+        border: 1px solid #fecaca !important;
+        text-align: center !important;
+        justify-content: center !important;
+    }}
+    
+    [data-testid="stSidebar"] .stButton > button:contains("🚪"):hover {{
+        background: #fee2e2 !important;
+        color: #b91c1c !important;
+        border-color: #fca5a5 !important;
+        border-left: 3px solid #dc2626 !important;
+    }}
+    
+    /* Main content area */
+    .main .block-container {{
+        padding-top: 2rem !important;
+        padding-right: 3rem !important;
+        padding-left: 3rem !important;
+    }}
+    
+    /* Fade in animation */
+    @keyframes fadeIn {{
+        from {{
+            opacity: 0;
+            transform: translateY(10px);
+        }}
+        to {{
+            opacity: 1;
+            transform: translateY(0);
+        }}
+    }}
+    
+    /* Animate sidebar items */
+    [data-testid="stSidebar"] .stButton {{
+        animation: fadeIn 0.3s ease-out !important;
+        animation-fill-mode: both !important;
+    }}
+    
+    /* Stagger animations for menu items */
+    [data-testid="stSidebar"] .stButton:nth-child(1) {{ animation-delay: 0.1s !important; border-bottom:solid 0.5px;}}
+    [data-testid="stSidebar"] .stButton:nth-child(2) {{ animation-delay: 0.15s !important; }}
+    [data-testid="stSidebar"] .stButton:nth-child(3) {{ animation-delay: 0.2s !important; }}
+    [data-testid="stSidebar"] .stButton:nth-child(4) {{ animation-delay: 0.25s !important; }}
+    [data-testid="stSidebar"] .stButton:nth-child(5) {{ animation-delay: 0.3s !important; }}
+    [data-testid="stSidebar"] .stButton:nth-child(6) {{ animation-delay: 0.35s !important; }}
+    [data-testid="stSidebar"] .stButton:nth-child(7) {{ animation-delay: 0.4s !important; }}
+    [data-testid="stSidebar"] .stButton:last-child {{ animation-delay: 0.5s !important; }}
+    
+    /* Remove Streamlit default button styles */
+    .stButton > button {{
+        border: none !important;
+        box-shadow: none !important;
+        
+    }}
+    
+    /* Sidebar scrollbar styling */
+    [data-testid="stSidebar"]::-webkit-scrollbar {{
+        width: 6px !important;
+    }}
+    
+    [data-testid="stSidebar"]::-webkit-scrollbar-track {{
+        background: #f1f5f9 !important;
+    }}
+    
+    [data-testid="stSidebar"]::-webkit-scrollbar-thumb {{
+        background: #cbd5e1 !important;
+        border-radius: 3px !important;
+    }}
+    
+    [data-testid="stSidebar"]::-webkit-scrollbar-thumb:hover {{
+        background: #94a3b8 !important;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
     
     # Sidebar with menu buttons instead of radio
     with st.sidebar:
@@ -475,15 +764,15 @@ def learner_dashboard():
             <div class="user-avatar">
                 {st.session_state.username[0].upper() if st.session_state.username else 'U'}
             </div>
-            <h3 style="color: var(--text-primary);">{st.session_state.username}</h3>
-            <p style="color: var(--text-secondary); font-size: 0.875rem;">SmartTrack-AI Platform</p>
+            <h3 style="color: #1e293b;">{st.session_state.username}</h3>
+            <p style="color: #64748b; font-size: 0.875rem;">Skill Assessment Generator</p>
         </div>
         """, unsafe_allow_html=True)
         
         st.markdown("---")
         
         # Navigation Menu
-        st.markdown("<h2 style='color:black'>📍 Navigation </h2>",  unsafe_allow_html=True)
+        st.markdown("<h2>📍 Navigation</h2>", unsafe_allow_html=True)
         
         # Create menu buttons
         menu_items = [
@@ -500,11 +789,12 @@ def learner_dashboard():
         for icon_name, page_name in menu_items:
             if st.button(f"{icon_name}", key=f"menu_{page_name}", use_container_width=True):
                 st.session_state.current_page = page_name
+                st.markdown("---")
                 st.rerun()
         
         st.markdown("---")
         
-        if st.button("🚪 Logout", use_container_width=True, type="primary"):
+        if st.button("🚪 Logout", use_container_width=True):
             st.session_state.logged_in = False
             st.session_state.username = None
             st.session_state.user_id = None
@@ -3246,7 +3536,7 @@ def load_css():
     .level-novice { background: var(--novice); color: white; }
     
     div.stButton{
-     background-color:green;
+     background-color:none;
     }
     
     /* Buttons - Fixed */
@@ -3299,8 +3589,8 @@ def load_css():
 # ============================================
 def generate_with_fallback(prompt):
     GEMINI_API_KEYS = [
-        "AIzaSyB7GckkWFujMxK7XSDpQ156m0imoIeGmZ4",
-        "AIzaSyAgqBSEGCkV3-CkCsMuN5kLW0yuCJDAQpo"
+        "AIzaSyDOTVWTAWF2VX_MFBs8sgUS0eSUFaz_eXw",
+        
     ]
     
     for index, api_key in enumerate(GEMINI_API_KEYS, start=1):
@@ -3403,21 +3693,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
