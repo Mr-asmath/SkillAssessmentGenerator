@@ -53,6 +53,61 @@ def init_db():
             certificate_id TEXT UNIQUE,
             topic TEXT,
             score INTEGER,
+            iimport streamlit as st
+import google.generativeai as genai
+import time
+import sqlite3
+import hashlib
+import pandas as pd
+from datetime import datetime, timedelta
+import plotly.express as px
+import plotly.graph_objects as go
+import secrets
+import string
+import random
+from io import BytesIO
+import base64
+
+# ============================================
+# DATABASE SETUP & ADMIN FUNCTIONS
+# ============================================
+def init_db():
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_login TIMESTAMP,
+            is_active INTEGER DEFAULT 1,
+            is_admin INTEGER DEFAULT 0
+        )
+    ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS user_scores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            topic TEXT,
+            score INTEGER,
+            total_questions INTEGER,
+            difficulty TEXT,
+            level TEXT,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    ''')
+    
+    # Create certificates table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS certificates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            certificate_id TEXT UNIQUE,
+            topic TEXT,
+            score INTEGER,
             issue_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             expiry_date TIMESTAMP,
             status TEXT DEFAULT 'active',
@@ -825,7 +880,7 @@ def show_dashboard_home():
     st.markdown("""
     <div style="max-width: 1200px; margin: 0 auto; padding: 2rem;">
         <h1 style="font-size: 2.5rem; font-weight: 800; color: var(--text-primary); margin-bottom: 0.5rem;">
-            🎯 Welcome to SmartTrack-AI
+            🎯 Welcome to Skill Assessment Generator 
         </h1>
         <p style="color: var(--text-secondary); margin-bottom: 3rem;">
             Your personal learning and assessment dashboard
