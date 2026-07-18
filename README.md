@@ -27,14 +27,12 @@ Create `.streamlit/secrets.toml` in the project root, or `QAUpload/.streamlit/se
 GEMINI_API_KEY = "your-gemini-api-key"
 ```
 
-You can also use environment variables:
+You can also use an environment variable:
 
 ```bash
 set GEMINI_API_KEY=your-gemini-api-key
 streamlit run QAUpload/app.py
 ```
-
-For multiple fallback keys, set `GEMINI_API_KEYS` as a comma-separated list.
 
 ## Deploy On Streamlit Community Cloud
 

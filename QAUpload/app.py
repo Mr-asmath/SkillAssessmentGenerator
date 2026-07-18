@@ -3589,16 +3589,15 @@ def load_css():
 # ============================================
 # GEMINI API FUNCTION
 # ============================================
-def _normalize_api_keys(raw_value):
+def _clean_secret_value(raw_value):
     if not raw_value:
-        return []
+        return None
 
     if isinstance(raw_value, (list, tuple)):
-        values = raw_value
-    else:
-        values = str(raw_value).split(",")
+        raw_value = raw_value[0] if raw_value else None
 
-    return [value.strip() for value in values if str(value).strip()]
+    value = str(raw_value).strip()
+    return value or None
 
 def _read_local_secret_file(path):
     values = {}
@@ -3632,27 +3631,20 @@ def get_local_secrets():
 
     return secrets_data
 
-def get_gemini_api_keys():
-    keys = []
+def get_gemini_api_key():
     local_secrets = get_local_secrets()
-
-    keys.extend(_normalize_api_keys(os.getenv("GEMINI_API_KEYS")))
-    keys.extend(_normalize_api_keys(os.getenv("GEMINI_API_KEY")))
-    keys.extend(_normalize_api_keys(local_secrets.get("GEMINI_API_KEYS")))
-    keys.extend(_normalize_api_keys(local_secrets.get("GEMINI_API_KEY")))
+    api_key = _clean_secret_value(os.getenv("GEMINI_API_KEY"))
+    if api_key:
+        return api_key
 
     try:
-        keys.extend(_normalize_api_keys(st.secrets.get("GEMINI_API_KEYS")))
-        keys.extend(_normalize_api_keys(st.secrets.get("GEMINI_API_KEY")))
-
-        gemini_config = st.secrets.get("gemini", {})
-        if isinstance(gemini_config, dict):
-            keys.extend(_normalize_api_keys(gemini_config.get("api_keys")))
-            keys.extend(_normalize_api_keys(gemini_config.get("api_key")))
+        api_key = _clean_secret_value(st.secrets.get("GEMINI_API_KEY"))
+        if api_key:
+            return api_key
     except Exception:
         pass
 
-    return list(dict.fromkeys(keys))
+    return _clean_secret_value(local_secrets.get("GEMINI_API_KEY"))
 
 def get_gemini_model():
     local_secrets = get_local_secrets()
@@ -3668,36 +3660,27 @@ def get_gemini_model():
         return os.getenv("GEMINI_MODEL") or local_secrets.get("GEMINI_MODEL") or "models/gemini-2.5-flash"
 
 def generate_with_fallback(prompt):
-    gemini_api_keys = get_gemini_api_keys()
+    gemini_api_key = get_gemini_api_key()
     model_name = get_gemini_model()
 
-    if not gemini_api_keys:
+    if not gemini_api_key:
         st.error("Gemini API key is missing. Set GEMINI_API_KEY or add it to Streamlit secrets.")
         return None
-    
-    for api_key in gemini_api_keys:
-        try:
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt)
-            
-            if not response or not response.text:
-                raise RuntimeError("Empty response received")
-                
-            return response.text.strip()
-            
-        except Exception as e:
-            error_msg = str(e).lower()
-            
-            if any(k in error_msg for k in ["quota", "limit", "429", "permission", "auth", "key"]):
-                time.sleep(1)
-                continue
-            else:
-                st.error(f"API Error: {str(e)[:100]}")
-                return None
-    
-    st.error("All configured Gemini API keys failed. Please check quota, billing, or key permissions.")
-    return None
+
+    try:
+        genai.configure(api_key=gemini_api_key)
+        model = genai.GenerativeModel(model_name)
+        response = model.generate_content(prompt)
+
+        if not response or not response.text:
+            st.error("Gemini returned an empty response. Please try again.")
+            return None
+
+        return response.text.strip()
+
+    except Exception as e:
+        st.error(f"Gemini API error: {str(e)[:160]}")
+        return None
 
 # ============================================
 # STREAMLIT APP CONFIG
