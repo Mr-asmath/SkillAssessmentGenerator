@@ -5,6 +5,7 @@ import time
 import sqlite3
 import hashlib
 import pandas as pd
+from pathlib import Path
 from datetime import datetime, timedelta
 import plotly.express as px
 import plotly.graph_objects as go
@@ -3599,11 +3600,46 @@ def _normalize_api_keys(raw_value):
 
     return [value.strip() for value in values if str(value).strip()]
 
+def _read_local_secret_file(path):
+    values = {}
+
+    if not path.exists():
+        return values
+
+    try:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            clean_line = line.strip()
+            if not clean_line or clean_line.startswith("#") or "=" not in clean_line:
+                continue
+
+            key, value = clean_line.split("=", 1)
+            values[key.strip()] = value.strip().strip('"').strip("'")
+    except OSError:
+        pass
+
+    return values
+
+def get_local_secrets():
+    app_dir = Path(__file__).resolve().parent
+    secret_paths = [
+        Path.cwd() / ".streamlit" / "secrets.toml",
+        app_dir / ".streamlit" / "secrets.toml",
+    ]
+
+    secrets_data = {}
+    for secret_path in secret_paths:
+        secrets_data.update(_read_local_secret_file(secret_path))
+
+    return secrets_data
+
 def get_gemini_api_keys():
     keys = []
+    local_secrets = get_local_secrets()
 
     keys.extend(_normalize_api_keys(os.getenv("GEMINI_API_KEYS")))
     keys.extend(_normalize_api_keys(os.getenv("GEMINI_API_KEY")))
+    keys.extend(_normalize_api_keys(local_secrets.get("GEMINI_API_KEYS")))
+    keys.extend(_normalize_api_keys(local_secrets.get("GEMINI_API_KEY")))
 
     try:
         keys.extend(_normalize_api_keys(st.secrets.get("GEMINI_API_KEYS")))
@@ -3619,10 +3655,17 @@ def get_gemini_api_keys():
     return list(dict.fromkeys(keys))
 
 def get_gemini_model():
+    local_secrets = get_local_secrets()
+
     try:
-        return st.secrets.get("GEMINI_MODEL") or os.getenv("GEMINI_MODEL") or "models/gemini-2.5-flash"
+        return (
+            st.secrets.get("GEMINI_MODEL")
+            or os.getenv("GEMINI_MODEL")
+            or local_secrets.get("GEMINI_MODEL")
+            or "models/gemini-2.5-flash"
+        )
     except Exception:
-        return os.getenv("GEMINI_MODEL", "models/gemini-2.5-flash")
+        return os.getenv("GEMINI_MODEL") or local_secrets.get("GEMINI_MODEL") or "models/gemini-2.5-flash"
 
 def generate_with_fallback(prompt):
     gemini_api_keys = get_gemini_api_keys()

@@ -21,7 +21,7 @@ streamlit run app.py
 
 ## Configure Gemini
 
-Create `QAUpload/.streamlit/secrets.toml` from the example file:
+Create `.streamlit/secrets.toml` in the project root, or `QAUpload/.streamlit/secrets.toml` from the example file:
 
 ```toml
 GEMINI_API_KEY = "your-gemini-api-key"
