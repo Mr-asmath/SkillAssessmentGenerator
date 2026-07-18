@@ -1,5 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
+import os
 import time
 import sqlite3
 import hashlib
@@ -3587,16 +3588,54 @@ def load_css():
 # ============================================
 # GEMINI API FUNCTION
 # ============================================
+def _normalize_api_keys(raw_value):
+    if not raw_value:
+        return []
+
+    if isinstance(raw_value, (list, tuple)):
+        values = raw_value
+    else:
+        values = str(raw_value).split(",")
+
+    return [value.strip() for value in values if str(value).strip()]
+
+def get_gemini_api_keys():
+    keys = []
+
+    keys.extend(_normalize_api_keys(os.getenv("GEMINI_API_KEYS")))
+    keys.extend(_normalize_api_keys(os.getenv("GEMINI_API_KEY")))
+
+    try:
+        keys.extend(_normalize_api_keys(st.secrets.get("GEMINI_API_KEYS")))
+        keys.extend(_normalize_api_keys(st.secrets.get("GEMINI_API_KEY")))
+
+        gemini_config = st.secrets.get("gemini", {})
+        if isinstance(gemini_config, dict):
+            keys.extend(_normalize_api_keys(gemini_config.get("api_keys")))
+            keys.extend(_normalize_api_keys(gemini_config.get("api_key")))
+    except Exception:
+        pass
+
+    return list(dict.fromkeys(keys))
+
+def get_gemini_model():
+    try:
+        return st.secrets.get("GEMINI_MODEL") or os.getenv("GEMINI_MODEL") or "models/gemini-2.5-flash"
+    except Exception:
+        return os.getenv("GEMINI_MODEL", "models/gemini-2.5-flash")
+
 def generate_with_fallback(prompt):
-    GEMINI_API_KEYS = [
-        "AIzaSyCmDJ1S71qIfIW5jztUqzeKJwOOSBhJ8Wc",
-        
-    ]
+    gemini_api_keys = get_gemini_api_keys()
+    model_name = get_gemini_model()
+
+    if not gemini_api_keys:
+        st.error("Gemini API key is missing. Set GEMINI_API_KEY or add it to Streamlit secrets.")
+        return None
     
-    for index, api_key in enumerate(GEMINI_API_KEYS, start=1):
+    for api_key in gemini_api_keys:
         try:
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel("models/gemini-2.5-flash")
+            model = genai.GenerativeModel(model_name)
             response = model.generate_content(prompt)
             
             if not response or not response.text:
@@ -3614,7 +3653,8 @@ def generate_with_fallback(prompt):
                 st.error(f"API Error: {str(e)[:100]}")
                 return None
     
-    raise RuntimeError("All API keys exhausted. Please try again later.")
+    st.error("All configured Gemini API keys failed. Please check quota, billing, or key permissions.")
+    return None
 
 # ============================================
 # STREAMLIT APP CONFIG

@@ -1,0 +1,16 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Streamlit local secrets and runtime data
+.streamlit/secrets.toml
+QAUpload/.streamlit/secrets.toml
+users.db
+QAUpload/users.db
+
+# Generated files
+*.log
+.DS_Store
+Thumbs.db
